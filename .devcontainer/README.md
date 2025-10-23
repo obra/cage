@@ -6,6 +6,7 @@ This is the default dev container used by cage when a project doesn't have its o
 
 - Microsoft devcontainer base (Ubuntu)
 - Claude Code pre-installed
+- OpenAI Codex CLI pre-installed
 - Git and common utilities
 - User: `vscode` (UID 1000)
 
