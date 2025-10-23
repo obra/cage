@@ -8,8 +8,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/jessedrelick/cage/pkg/container"
-	"github.com/jessedrelick/cage/pkg/docker"
+	"github.com/obra/cage/pkg/container"
+	"github.com/obra/cage/pkg/docker"
 	"github.com/spf13/cobra"
 )
 

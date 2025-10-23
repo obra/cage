@@ -1,4 +1,4 @@
-module github.com/jessedrelick/cage
+module github.com/obra/cage
 
 go 1.22.2
 

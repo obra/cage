@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/jessedrelick/cage/pkg/runner"
+	"github.com/obra/cage/pkg/runner"
 	"github.com/spf13/cobra"
 )
 
