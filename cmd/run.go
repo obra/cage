@@ -1,6 +1,10 @@
 package cmd
 
 import (
+	"fmt"
+	"os"
+
+	"github.com/jessedrelick/cage/pkg/runner"
 	"github.com/spf13/cobra"
 )
 
@@ -17,9 +21,22 @@ var runCmd = &cobra.Command{
 	Short: "Run command in container",
 	Long:  `Start a container and execute the specified command inside it.`,
 	Args:  cobra.MinimumNArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		// TODO: implement
-		cmd.Println("run command not yet implemented")
+	RunE: func(cmd *cobra.Command, args []string) error {
+		config := &runner.RunConfig{
+			Path:       runPath,
+			Worktree:   runWorktree,
+			NoWorktree: runNoWorktree,
+			Env:        runEnv,
+			Verbose:    runVerbose,
+			Command:    args,
+		}
+
+		if err := runner.Run(config); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return err
+		}
+
+		return nil
 	},
 }
 

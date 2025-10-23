@@ -62,3 +62,8 @@ func (c *Client) Run(args ...string) (string, error) {
 
 	return string(output), err
 }
+
+// Command returns the docker command being used
+func (c *Client) Command() string {
+	return c.cmd
+}
