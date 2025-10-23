@@ -43,6 +43,10 @@ var runCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(runCmd)
 
+	// Disable flag parsing after first positional arg (the command to run)
+	// This allows the command and its args to be passed through without interpretation
+	runCmd.Flags().SetInterspersed(false)
+
 	runCmd.Flags().StringVar(&runPath, "path", "", "Project path (default: pwd)")
 	runCmd.Flags().StringVar(&runWorktree, "worktree", "", "Worktree name (creates if needed)")
 	runCmd.Flags().BoolVar(&runNoWorktree, "no-worktree", false, "Skip worktree, use directory directly")
