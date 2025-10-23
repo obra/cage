@@ -125,8 +125,8 @@ func Run(config *RunConfig) error {
 		return fmt.Errorf("container already running. Use 'cage attach --worktree=%s' or 'cage stop --worktree=%s'", worktreeName, worktreeName)
 	}
 
-	// Step 8: Build docker run command
-	args := []string{"run", "--rm", "-it"}
+	// Step 8: Build docker run command for background container
+	args := []string{"run", "-d", "-it"} // -d for detached, keep -it for interactive
 
 	// Add labels
 	args = append(args, container.LabelsToArgs(labels)...)
@@ -179,18 +179,53 @@ func Run(config *RunConfig) error {
 	}
 	args = append(args, imageName)
 
-	// Add command to run
-	args = append(args, config.Command...)
+	// Add a command that keeps container alive
+	args = append(args, "sleep", "infinity")
 
-	// Step 9: Run container
+	// Step 9: Start container in background
 	if config.Verbose {
 		fmt.Fprintf(os.Stderr, "Starting container %s\n", containerName)
 	}
 
-	// Execute docker run - this blocks until container exits
-	// We need to run this interactively, not via dockerClient.Run()
-	// because we need to preserve stdin/stdout/stderr
-	return execDocker(dockerClient, args)
+	containerID, err := dockerClient.Run(args...)
+	if err != nil {
+		return fmt.Errorf("failed to start container: %w", err)
+	}
+	containerID = strings.TrimSpace(containerID)
+
+	// Step 10: Copy ~/.claude.json into container
+	claudeConfigSrc := filepath.Join(homeDir, ".claude.json")
+	claudeConfigDst := fmt.Sprintf("%s:/home/%s/.claude.json", containerID, devConfig.RemoteUser)
+
+	if _, err := os.Stat(claudeConfigSrc); err == nil {
+		if config.Verbose {
+			fmt.Fprintf(os.Stderr, "Copying %s to container\n", claudeConfigSrc)
+		}
+		_, err = dockerClient.Run("cp", claudeConfigSrc, claudeConfigDst)
+		if err != nil {
+			// Clean up container on error
+			dockerClient.Run("rm", "-f", containerID)
+			return fmt.Errorf("failed to copy .claude.json: %w", err)
+		}
+	}
+
+	// Step 11: Exec into container with user's command
+	cmdPath, err := exec.LookPath(dockerClient.Command())
+	if err != nil {
+		return fmt.Errorf("failed to find docker command: %w", err)
+	}
+
+	execArgs := []string{
+		filepath.Base(cmdPath),
+		"exec",
+		"-it",
+		"-w", "/workspace",
+		containerID,
+	}
+	execArgs = append(execArgs, config.Command...)
+
+	// Use syscall.Exec to replace current process
+	return syscall.Exec(cmdPath, execArgs, os.Environ())
 }
 
 func ensureImage(dockerClient *docker.Client, config *devcontainer.Config, projectPath string, verbose bool) error {
@@ -245,17 +280,4 @@ func containerIsRunning(dockerClient *docker.Client, name string) (bool, error) 
 		return false, err
 	}
 	return strings.TrimSpace(output) == name, nil
-}
-
-func execDocker(dockerClient *docker.Client, args []string) error {
-	// Get docker command path
-	cmdPath, err := exec.LookPath(dockerClient.Command())
-	if err != nil {
-		return fmt.Errorf("failed to find docker command: %w", err)
-	}
-
-	// Use syscall.Exec to replace current process
-	// This preserves stdin/stdout/stderr properly for interactive mode
-	argv := append([]string{filepath.Base(cmdPath)}, args...)
-	return syscall.Exec(cmdPath, argv, os.Environ())
 }
