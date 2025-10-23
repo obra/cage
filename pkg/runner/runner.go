@@ -286,25 +286,27 @@ func Run(config *RunConfig) error {
 	args = append(args, "-w", workingDir)
 
 	// Add environment variables
-	// Start with safe baseline - only pass through specific safe variables
-	safeEnvVars := []string{"TERM", "LANG", "LC_ALL", "LC_CTYPE", "COLORTERM"}
+	// Only pass safe terminal/locale variables - nothing else from host
+	safeEnvVars := []string{"TERM", "LANG", "LC_ALL", "LC_CTYPE", "LC_MESSAGES", "COLORTERM"}
 	for _, key := range safeEnvVars {
 		if value := os.Getenv(key); value != "" {
 			args = append(args, "-e", fmt.Sprintf("%s=%s", key, value))
 		}
 	}
 
-	// Set HOME to container user's home directory
+	// Set HOME to container user's home directory (don't use host HOME)
 	args = append(args, "-e", fmt.Sprintf("HOME=/home/%s", devConfig.RemoteUser))
 
-	// Add IS_SANDBOX marker
+	// Add IS_SANDBOX marker so tools know they're in a sandbox
 	args = append(args, "-e", "IS_SANDBOX=1")
+
+	// Don't set PATH - use container's default PATH to avoid host pollution
 
 	// Add user-specified env vars from --env flags
 	for _, env := range config.Env {
 		// Support both --env KEY=value and --env KEY (pass through from host)
 		if strings.Contains(env, "=") {
-			// KEY=value format
+			// KEY=value format - set specific value
 			args = append(args, "-e", env)
 		} else {
 			// KEY format - pass through current value from host
