@@ -168,23 +168,37 @@ func Run(config *RunConfig) error {
 	}
 
 	// Mount workspace
+	// On macOS with worktrees, we need to mount parent directory to preserve git paths
+	var workingDir string
 	if isLinux {
 		args = append(args, "--mount", fmt.Sprintf(
 			"type=bind,source=%s,target=/workspace,idmap=uids=%s-%s-1000:gids=%s-%s-1000",
 			mountPath, currentUser.Uid, currentUser.Uid, currentUser.Gid, currentUser.Gid,
 		))
+		workingDir = "/workspace"
 	} else {
-		// macOS - no idmap support
-		args = append(args, "-v", fmt.Sprintf("%s:/workspace", mountPath))
+		// macOS - mount parent directory to preserve git worktree paths
+		// This allows .git file references to resolve correctly
+		parentDir := filepath.Dir(mountPath)
+		args = append(args, "-v", fmt.Sprintf("%s:%s", parentDir, parentDir))
+		workingDir = mountPath
 	}
 
 	// Set working directory
-	args = append(args, "-w", "/workspace")
+	args = append(args, "-w", workingDir)
 
 	// Add environment variables
-	// Copy host environment
+	// Copy host environment, but skip HOME on macOS since it points to host path
 	for _, env := range os.Environ() {
+		if !isLinux && strings.HasPrefix(env, "HOME=") {
+			continue
+		}
 		args = append(args, "-e", env)
+	}
+
+	// Set HOME to container user's home directory
+	if !isLinux {
+		args = append(args, "-e", fmt.Sprintf("HOME=/home/%s", devConfig.RemoteUser))
 	}
 
 	// Add IS_SANDBOX
