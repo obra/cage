@@ -144,6 +144,28 @@ func Run(config *RunConfig) error {
 	// Check if we're on Linux (idmap only supported on Linux)
 	isLinux := os.Getenv("OSTYPE") == "linux-gnu" || fileExists("/proc/version")
 
+	// On macOS, extract credentials from Keychain and create temp file
+	var credentialsTempFile string
+	if !isLinux {
+		creds, err := getClaudeCredentialsFromKeychain()
+		if err != nil {
+			if config.Verbose {
+				fmt.Fprintf(os.Stderr, "Warning: Could not get credentials from Keychain: %v\n", err)
+			}
+		} else {
+			credentialsTempFile, err = createCredentialsTempFile(creds)
+			if err != nil {
+				return fmt.Errorf("failed to create credentials temp file: %w", err)
+			}
+			// Clean up temp file when done
+			defer os.Remove(credentialsTempFile)
+
+			if config.Verbose {
+				fmt.Fprintf(os.Stderr, "Created credentials temp file: %s\n", credentialsTempFile)
+			}
+		}
+	}
+
 	// Build docker run command for background container
 	args := []string{"run", "-d", "-it"} // -d for detached, keep -it for interactive
 
@@ -165,6 +187,11 @@ func Run(config *RunConfig) error {
 	} else {
 		// macOS - Docker Desktop handles permissions automatically
 		args = append(args, "-v", fmt.Sprintf("%s/.claude:/home/%s/.claude", homeDir, devConfig.RemoteUser))
+
+		// macOS only: Mount credentials file if we extracted it from Keychain
+		if credentialsTempFile != "" {
+			args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.claude/.credentials.json:ro", credentialsTempFile, devConfig.RemoteUser))
+		}
 	}
 
 	// Mount workspace
@@ -322,4 +349,47 @@ func containerIsRunning(dockerClient *docker.Client, name string) (bool, error) 
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+// getClaudeCredentialsFromKeychain extracts Claude credentials from macOS Keychain
+func getClaudeCredentialsFromKeychain() (string, error) {
+	cmd := exec.Command("security", "find-generic-password",
+		"-s", "Claude Code-credentials",
+		"-w")
+
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to get credentials from keychain: %w", err)
+	}
+
+	return strings.TrimSpace(string(output)), nil
+}
+
+// createCredentialsTempFile creates a temporary file with credentials (mode 600)
+func createCredentialsTempFile(credentials string) (string, error) {
+	tmpFile, err := os.CreateTemp("", "cage-credentials-*.json")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+
+	// Set mode 600 (owner read/write only)
+	if err := tmpFile.Chmod(0600); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return "", fmt.Errorf("failed to set file permissions: %w", err)
+	}
+
+	// Write credentials
+	if _, err := tmpFile.WriteString(credentials); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return "", fmt.Errorf("failed to write credentials: %w", err)
+	}
+
+	if err := tmpFile.Close(); err != nil {
+		os.Remove(tmpFile.Name())
+		return "", fmt.Errorf("failed to close temp file: %w", err)
+	}
+
+	return tmpFile.Name(), nil
 }
