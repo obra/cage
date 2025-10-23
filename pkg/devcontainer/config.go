@@ -43,7 +43,8 @@ func LoadConfig(projectPath string) (*Config, error) {
 // GetDefaultConfig returns the default devcontainer config
 func GetDefaultConfig() *Config {
 	return &Config{
+		// TODO: Switch to ghcr.io/obra/cage-default:latest once built and published
 		Image:      "mcr.microsoft.com/devcontainers/base:ubuntu",
-		RemoteUser: "devuser",
+		RemoteUser: "vscode",
 	}
 }

@@ -82,8 +82,21 @@ cage list
 
 1. Checks for `.devcontainer/devcontainer.json` in project
 2. Falls back to `mcr.microsoft.com/devcontainers/base:ubuntu` if not found
+   - Future: will use `ghcr.io/obra/cage-default:latest` with Claude pre-installed
 3. Supports both `image` (pulls) and `dockerFile` (builds) fields
 4. Auto-pulls/builds images as needed
+
+### Building the Default Container with Claude
+
+To build a custom default container with Claude pre-installed:
+
+```bash
+cd .devcontainer
+docker build -t ghcr.io/obra/cage-default:latest .
+docker push ghcr.io/obra/cage-default:latest  # Requires GitHub authentication
+```
+
+Then update `pkg/devcontainer/config.go` to use the new image.
 
 ### File Mounts
 

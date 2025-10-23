@@ -1,0 +1,9 @@
+{
+  "name": "Cage Default Container with Claude",
+  "dockerFile": "Dockerfile",
+  "remoteUser": "vscode",
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {},
+    "ghcr.io/devcontainers/features/git:1": {}
+  }
+}
