@@ -300,6 +300,14 @@ func Run(config *RunConfig) error {
 			dockerClient.Run("rm", "-f", containerID)
 			return fmt.Errorf("failed to copy .claude.json: %w", err)
 		}
+
+		// Fix ownership to match container user (docker cp creates files as root)
+		_, err = dockerClient.Run("exec", containerID, "chown", fmt.Sprintf("%s:%s", devConfig.RemoteUser, devConfig.RemoteUser), fmt.Sprintf("/home/%s/.claude.json", devConfig.RemoteUser))
+		if err != nil {
+			if config.Verbose {
+				fmt.Fprintf(os.Stderr, "Warning: failed to fix .claude.json ownership: %v\n", err)
+			}
+		}
 	}
 
 	// Step 11: Exec into container with user's command
