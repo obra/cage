@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/obra/cage/pkg/container"
 	"github.com/obra/cage/pkg/docker"
@@ -13,6 +15,7 @@ import (
 var (
 	stopPath     string
 	stopWorktree string
+	stopAll      bool
 )
 
 var stopCmd = &cobra.Command{
@@ -20,6 +23,17 @@ var stopCmd = &cobra.Command{
 	Short: "Stop container",
 	Long:  `Stop the container for the specified project/worktree.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Initialize Docker client
+		dockerClient, err := docker.NewClient(false)
+		if err != nil {
+			return fmt.Errorf("failed to initialize docker: %w", err)
+		}
+
+		// If --all flag, stop all cage-managed containers
+		if stopAll {
+			return stopAllContainers(dockerClient)
+		}
+
 		// Determine working directory
 		workDir := stopPath
 		if workDir == "" {
@@ -30,7 +44,7 @@ var stopCmd = &cobra.Command{
 			}
 		}
 
-		workDir, err := filepath.Abs(workDir)
+		workDir, err = filepath.Abs(workDir)
 		if err != nil {
 			return fmt.Errorf("failed to resolve path: %w", err)
 		}
@@ -38,34 +52,67 @@ var stopCmd = &cobra.Command{
 		// Determine worktree name
 		worktreeName := stopWorktree
 		if worktreeName == "" {
-			return fmt.Errorf("--worktree flag is required for stop")
+			return fmt.Errorf("--worktree flag is required for stop (or use --all)")
 		}
 
 		// Generate container name
 		containerName := container.GenerateContainerName(workDir, worktreeName)
 
-		// Initialize Docker client
-		dockerClient, err := docker.NewClient(false)
-		if err != nil {
-			return fmt.Errorf("failed to initialize docker: %w", err)
-		}
-
-		// Stop container
-		fmt.Printf("Stopping container %s...\n", containerName)
-		_, err = dockerClient.Run("stop", containerName)
-		if err != nil {
-			return fmt.Errorf("failed to stop container: %w", err)
-		}
-
-		// Remove container
-		_, err = dockerClient.Run("rm", containerName)
-		if err != nil {
-			return fmt.Errorf("failed to remove container: %w", err)
-		}
-
-		fmt.Printf("Container %s stopped and removed\n", containerName)
-		return nil
+		// Stop and remove container
+		return stopContainer(dockerClient, containerName)
 	},
+}
+
+func stopContainer(dockerClient *docker.Client, containerName string) error {
+	fmt.Printf("Stopping container %s...\n", containerName)
+	_, err := dockerClient.Run("stop", containerName)
+	if err != nil {
+		return fmt.Errorf("failed to stop container: %w", err)
+	}
+
+	_, err = dockerClient.Run("rm", containerName)
+	if err != nil {
+		return fmt.Errorf("failed to remove container: %w", err)
+	}
+
+	fmt.Printf("Container %s stopped and removed\n", containerName)
+	return nil
+}
+
+func stopAllContainers(dockerClient *docker.Client) error {
+	// Get all cage-managed containers
+	output, err := dockerClient.Run("ps", "--filter", "label=managed-by=cage", "--format", "{{json .}}")
+	if err != nil {
+		return fmt.Errorf("failed to list containers: %w", err)
+	}
+
+	if strings.TrimSpace(output) == "" {
+		fmt.Println("No cage-managed containers running")
+		return nil
+	}
+
+	// Parse container names
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	var containerNames []string
+	for _, line := range lines {
+		var info struct {
+			Names string `json:"Names"`
+		}
+		if err := json.Unmarshal([]byte(line), &info); err != nil {
+			continue
+		}
+		containerNames = append(containerNames, info.Names)
+	}
+
+	// Stop each container
+	for _, name := range containerNames {
+		if err := stopContainer(dockerClient, name); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: %v\n", err)
+		}
+	}
+
+	fmt.Printf("\nStopped %d container(s)\n", len(containerNames))
+	return nil
 }
 
 func init() {
@@ -73,4 +120,5 @@ func init() {
 
 	stopCmd.Flags().StringVar(&stopPath, "path", "", "Project path (default: pwd)")
 	stopCmd.Flags().StringVar(&stopWorktree, "worktree", "", "Worktree name")
+	stopCmd.Flags().BoolVar(&stopAll, "all", false, "Stop all cage-managed containers")
 }
