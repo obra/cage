@@ -1,5 +1,5 @@
 {
-  "name": "Cage Default Container with Claude & Codex",
+  "name": "Cage Default Container with AI CLIs",
   "dockerFile": "Dockerfile",
   "remoteUser": "vscode",
   "features": {

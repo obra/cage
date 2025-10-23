@@ -5,8 +5,11 @@ This is the default dev container used by cage when a project doesn't have its o
 ## What's Included
 
 - Microsoft devcontainer base (Ubuntu)
-- Claude Code pre-installed
-- OpenAI Codex CLI pre-installed
+- Node.js LTS
+- AI CLI tools (npm global packages):
+  - `@anthropic-ai/claude-code` - Claude Code CLI
+  - `@openai/codex` - OpenAI Codex CLI
+  - `@google/gemini-cli` - Google Gemini CLI
 - Git and common utilities
 - User: `vscode` (UID 1000)
 
