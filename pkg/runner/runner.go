@@ -178,12 +178,16 @@ func Run(config *RunConfig) error {
 	// Add mounts with or without idmap based on OS
 	homeDir := currentUser.HomeDir
 
-	// Mount .claude directory
+	// Mount .claude directory and workspace
+	// Note: idmap support is kernel/Docker version dependent, so we don't use it for now
+	// Just use simple volume mounts and run as container's default user
+	var workingDir string
+
 	if isLinux {
-		args = append(args, "--mount", fmt.Sprintf(
-			"type=bind,source=%s/.claude,target=/home/%s/.claude,idmap=uids=%s-%s-1000:gids=%s-%s-1000",
-			homeDir, devConfig.RemoteUser, currentUser.Uid, currentUser.Uid, currentUser.Gid, currentUser.Gid,
-		))
+		// Linux - simple bind mounts at /workspace
+		args = append(args, "-v", fmt.Sprintf("%s/.claude:/home/%s/.claude", homeDir, devConfig.RemoteUser))
+		args = append(args, "-v", fmt.Sprintf("%s:/workspace", mountPath))
+		workingDir = "/workspace"
 	} else {
 		// macOS - Docker Desktop handles permissions automatically
 		args = append(args, "-v", fmt.Sprintf("%s/.claude:/home/%s/.claude", homeDir, devConfig.RemoteUser))
@@ -192,20 +196,8 @@ func Run(config *RunConfig) error {
 		if credentialsTempFile != "" {
 			args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.claude/.credentials.json:ro", credentialsTempFile, devConfig.RemoteUser))
 		}
-	}
 
-	// Mount workspace
-	// On macOS with worktrees, we need to mount parent directory to preserve git paths
-	var workingDir string
-	if isLinux {
-		args = append(args, "--mount", fmt.Sprintf(
-			"type=bind,source=%s,target=/workspace,idmap=uids=%s-%s-1000:gids=%s-%s-1000",
-			mountPath, currentUser.Uid, currentUser.Uid, currentUser.Gid, currentUser.Gid,
-		))
-		workingDir = "/workspace"
-	} else {
 		// macOS - mount parent directory to preserve git worktree paths
-		// This allows .git file references to resolve correctly
 		parentDir := filepath.Dir(mountPath)
 		args = append(args, "-v", fmt.Sprintf("%s:%s", parentDir, parentDir))
 		workingDir = mountPath
