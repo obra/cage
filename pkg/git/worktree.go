@@ -9,12 +9,31 @@ import (
 )
 
 // DetermineWorktreePath calculates the path for a worktree
+// Uses XDG-compliant location: ~/.local/share/cage/worktrees/<project>/<worktree>
 func DetermineWorktreePath(projectPath, worktreeName string) string {
 	projectName := filepath.Base(projectPath)
 	sanitizedName := sanitizeBranchName(worktreeName)
 
-	parentDir := filepath.Dir(projectPath)
-	return filepath.Join(parentDir, fmt.Sprintf("%s-%s", projectName, sanitizedName))
+	// Get user's home directory
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		// Fallback to old behavior if can't get home
+		parentDir := filepath.Dir(projectPath)
+		return filepath.Join(parentDir, fmt.Sprintf("%s-%s", projectName, sanitizedName))
+	}
+
+	// XDG-compliant path: ~/.local/share/cage/worktrees/<project>/<worktree>
+	xdgDataHome := os.Getenv("XDG_DATA_HOME")
+	if xdgDataHome == "" {
+		xdgDataHome = filepath.Join(homeDir, ".local", "share")
+	}
+
+	worktreePath := filepath.Join(xdgDataHome, "cage", "worktrees", projectName, sanitizedName)
+
+	// Ensure parent directory exists
+	os.MkdirAll(filepath.Dir(worktreePath), 0755)
+
+	return worktreePath
 }
 
 // sanitizeBranchName converts branch name to filesystem-safe name

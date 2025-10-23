@@ -44,6 +44,7 @@ func Run(config *RunConfig) error {
 	// Step 2: Handle worktree logic
 	var mountPath string
 	var worktreeName string
+	var mainRepoGitDir string // Path to main repo's .git directory for mounting
 
 	if config.NoWorktree {
 		// Use directory directly
@@ -100,6 +101,9 @@ func Run(config *RunConfig) error {
 					return fmt.Errorf("failed to create worktree: %w", err)
 				}
 			}
+
+			// Get main repo's .git directory for mounting
+			mainRepoGitDir = filepath.Join(workDir, ".git")
 		}
 	}
 
@@ -149,19 +153,12 @@ func Run(config *RunConfig) error {
 			return fmt.Errorf("failed to find docker command: %w", err)
 		}
 
-		// Figure out working directory based on platform
-		var workDir string
-		if fileExists("/proc/version") {
-			workDir = "/workspace"
-		} else {
-			workDir = mountPath
-		}
-
+		// Always use /workspace as working directory
 		execArgs := []string{
 			filepath.Base(cmdPath),
 			"exec",
 			"-it",
-			"-w", workDir,
+			"-w", "/workspace",
 			containerID,
 		}
 		execArgs = append(execArgs, config.Command...)
@@ -212,30 +209,28 @@ func Run(config *RunConfig) error {
 	// Add mounts with or without idmap based on OS
 	homeDir := currentUser.HomeDir
 
-	// Mount .claude directory and workspace
+	// Mount .claude directory, workspace, and git directory (if worktree)
 	// Note: idmap support is kernel/Docker version dependent, so we don't use it for now
 	// Just use simple volume mounts and run as container's default user
-	var workingDir string
 
-	if isLinux {
-		// Linux - simple bind mounts at /workspace
-		args = append(args, "-v", fmt.Sprintf("%s/.claude:/home/%s/.claude", homeDir, devConfig.RemoteUser))
-		args = append(args, "-v", fmt.Sprintf("%s:/workspace", mountPath))
-		workingDir = "/workspace"
-	} else {
-		// macOS - Docker Desktop handles permissions automatically
-		args = append(args, "-v", fmt.Sprintf("%s/.claude:/home/%s/.claude", homeDir, devConfig.RemoteUser))
+	// Mount .claude directory
+	args = append(args, "-v", fmt.Sprintf("%s/.claude:/home/%s/.claude", homeDir, devConfig.RemoteUser))
 
-		// macOS only: Mount credentials file if we extracted it from Keychain
-		if credentialsTempFile != "" {
-			args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.claude/.credentials.json:ro", credentialsTempFile, devConfig.RemoteUser))
-		}
-
-		// macOS - mount parent directory to preserve git worktree paths
-		parentDir := filepath.Dir(mountPath)
-		args = append(args, "-v", fmt.Sprintf("%s:%s", parentDir, parentDir))
-		workingDir = mountPath
+	// macOS only: Mount credentials file if we extracted it from Keychain
+	if !isLinux && credentialsTempFile != "" {
+		args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.claude/.credentials.json:ro", credentialsTempFile, devConfig.RemoteUser))
 	}
+
+	// Mount workspace at /workspace
+	args = append(args, "-v", fmt.Sprintf("%s:/workspace", mountPath))
+
+	// If using a worktree, also mount the main repo's .git directory at its real path
+	// This allows the worktree's .git file (which contains gitdir: <path>) to resolve correctly
+	if mainRepoGitDir != "" {
+		args = append(args, "-v", fmt.Sprintf("%s:%s", mainRepoGitDir, mainRepoGitDir))
+	}
+
+	workingDir := "/workspace"
 
 	// Set working directory
 	args = append(args, "-w", workingDir)
