@@ -9,6 +9,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/obra/cage/pkg/config"
 	"github.com/obra/cage/pkg/container"
 	"github.com/obra/cage/pkg/devcontainer"
 	"github.com/obra/cage/pkg/docker"
@@ -16,12 +17,13 @@ import (
 )
 
 type RunConfig struct {
-	Path       string
-	Worktree   string
-	NoWorktree bool
-	Env        []string
-	Verbose    bool
-	Command    []string
+	Path        string
+	Worktree    string
+	NoWorktree  bool
+	Env         []string
+	Verbose     bool
+	Command     []string
+	Credentials config.Credentials
 }
 
 func Run(config *RunConfig) error {
@@ -238,6 +240,44 @@ func Run(config *RunConfig) error {
 	// This allows the worktree's .git file (which contains gitdir: <path>) to resolve correctly
 	if mainRepoGitDir != "" {
 		args = append(args, "-v", fmt.Sprintf("%s:%s", mainRepoGitDir, mainRepoGitDir))
+	}
+
+	// Mount credentials based on configuration
+	if config.Credentials.Git {
+		// Mount .gitconfig (read-only to prevent accidental changes)
+		gitconfigPath := filepath.Join(homeDir, ".gitconfig")
+		if fileExists(gitconfigPath) {
+			args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.gitconfig:ro", gitconfigPath, devConfig.RemoteUser))
+		}
+		// Mount .ssh directory (read-only for security)
+		sshPath := filepath.Join(homeDir, ".ssh")
+		if fileExists(sshPath) {
+			args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.ssh:ro", sshPath, devConfig.RemoteUser))
+		}
+	}
+
+	if config.Credentials.GH {
+		// Mount GitHub CLI config directory
+		ghConfigPath := filepath.Join(homeDir, ".config", "gh")
+		if fileExists(ghConfigPath) {
+			args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.config/gh:ro", ghConfigPath, devConfig.RemoteUser))
+		}
+	}
+
+	if config.Credentials.GPG {
+		// Mount .gnupg directory (read-only for security)
+		gnupgPath := filepath.Join(homeDir, ".gnupg")
+		if fileExists(gnupgPath) {
+			args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.gnupg:ro", gnupgPath, devConfig.RemoteUser))
+		}
+	}
+
+	if config.Credentials.NPM {
+		// Mount .npmrc file
+		npmrcPath := filepath.Join(homeDir, ".npmrc")
+		if fileExists(npmrcPath) {
+			args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.npmrc:ro", npmrcPath, devConfig.RemoteUser))
+		}
 	}
 
 	workingDir := "/workspace"

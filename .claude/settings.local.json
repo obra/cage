@@ -28,7 +28,16 @@
       "Bash(git push:*)",
       "Bash(git branch:*)",
       "Bash(go env:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(docker build:*)",
+      "Bash(docker run:*)",
+      "Bash(docker login:*)",
+      "Bash(docker push:*)",
+      "Bash(go install:*)",
+      "WebSearch",
+      "Bash(docker info:*)",
+      "Bash(docker exec cage-claude-launcher-test-branch bash -c \"cd /workspace && git status && pwd\")",
+      "Bash(docker exec:*)"
     ],
     "deny": [],
     "ask": []
