@@ -191,7 +191,17 @@ func Run(config *RunConfig) error {
 	// Add environment variables
 	// Copy host environment
 	for _, env := range os.Environ() {
+		// On macOS, skip HOME since we need to set it to match the container mount path
+		if !isLinux && strings.HasPrefix(env, "HOME=") {
+			continue
+		}
 		args = append(args, "-e", env)
+	}
+
+	// Set HOME appropriately
+	if !isLinux {
+		// On macOS, set HOME to match where we mounted .claude
+		args = append(args, "-e", fmt.Sprintf("HOME=/home/%s", devConfig.RemoteUser))
 	}
 
 	// Add IS_SANDBOX
