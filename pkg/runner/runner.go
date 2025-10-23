@@ -207,18 +207,16 @@ func Run(config *RunConfig) error {
 	args = append(args, "-w", workingDir)
 
 	// Add environment variables
-	// Copy host environment, but skip HOME on macOS since it points to host path
+	// Copy host environment, but skip HOME since it points to host path
 	for _, env := range os.Environ() {
-		if !isLinux && strings.HasPrefix(env, "HOME=") {
+		if strings.HasPrefix(env, "HOME=") {
 			continue
 		}
 		args = append(args, "-e", env)
 	}
 
-	// Set HOME to container user's home directory
-	if !isLinux {
-		args = append(args, "-e", fmt.Sprintf("HOME=/home/%s", devConfig.RemoteUser))
-	}
+	// Set HOME to container user's home directory on all platforms
+	args = append(args, "-e", fmt.Sprintf("HOME=/home/%s", devConfig.RemoteUser))
 
 	// Add IS_SANDBOX
 	args = append(args, "-e", "IS_SANDBOX=1")
