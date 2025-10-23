@@ -135,7 +135,16 @@ func Run(config *RunConfig) error {
 		return fmt.Errorf("container already running. Use 'cage attach --worktree=%s' or 'cage stop --worktree=%s'", worktreeName, worktreeName)
 	}
 
-	// Step 8: Build docker run command for background container
+	// Step 8: Get current user and detect OS
+	currentUser, err := user.Current()
+	if err != nil {
+		return fmt.Errorf("failed to get current user: %w", err)
+	}
+
+	// Check if we're on Linux (idmap only supported on Linux)
+	isLinux := os.Getenv("OSTYPE") == "linux-gnu" || fileExists("/proc/version")
+
+	// Build docker run command for background container
 	args := []string{"run", "-d", "-it"} // -d for detached, keep -it for interactive
 
 	// Add labels
@@ -144,17 +153,15 @@ func Run(config *RunConfig) error {
 	// Add name
 	args = append(args, "--name", containerName)
 
-	// Get current user for idmap
-	currentUser, err := user.Current()
-	if err != nil {
-		return fmt.Errorf("failed to get current user: %w", err)
+	// On macOS, run as host user to avoid permission issues with mounted volumes
+	// Docker Desktop on macOS uses osxfs which maps file ownership automatically,
+	// but only when the container user matches the host user UID
+	if !isLinux {
+		args = append(args, "--user", fmt.Sprintf("%s:%s", currentUser.Uid, currentUser.Gid))
 	}
 
 	// Add mounts with or without idmap based on OS
 	homeDir := currentUser.HomeDir
-
-	// Check if we're on Linux (idmap only supported on Linux)
-	isLinux := os.Getenv("OSTYPE") == "linux-gnu" || fileExists("/proc/version")
 
 	// Mount .claude directory
 	if isLinux {
@@ -232,21 +239,7 @@ func Run(config *RunConfig) error {
 		}
 	}
 
-	// Step 11: Fix permissions on macOS (mounted volumes appear as vscode user but need write access)
-	if !isLinux {
-		if config.Verbose {
-			fmt.Fprintf(os.Stderr, "Fixing permissions for macOS...\n")
-		}
-		// Run as root to fix permissions on the mounted .claude directory
-		_, err = dockerClient.Run("exec", "-u", "root", containerID, "chown", "-R", "vscode:vscode", "/home/vscode/.claude")
-		if err != nil {
-			if config.Verbose {
-				fmt.Fprintf(os.Stderr, "Warning: failed to fix permissions: %v\n", err)
-			}
-		}
-	}
-
-	// Step 12: Exec into container with user's command
+	// Step 11: Exec into container with user's command
 	cmdPath, err := exec.LookPath(dockerClient.Command())
 	if err != nil {
 		return fmt.Errorf("failed to find docker command: %w", err)
