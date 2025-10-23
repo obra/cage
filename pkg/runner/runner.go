@@ -256,7 +256,7 @@ func Run(config *RunConfig) error {
 		filepath.Base(cmdPath),
 		"exec",
 		"-it",
-		"-w", "/workspace",
+		"-w", workingDir,
 		containerID,
 	}
 	execArgs = append(execArgs, config.Command...)
