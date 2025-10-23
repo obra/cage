@@ -128,11 +128,45 @@ func Run(config *RunConfig) error {
 	containerName := container.GenerateContainerName(workDir, worktreeName)
 	labels := container.GenerateLabels(projectName, worktreeName)
 
-	// Step 7: Check if container already running
+	// Step 7: Check if container already running - if so, just exec into it
 	if isRunning, err := containerIsRunning(dockerClient, containerName); err != nil {
 		return fmt.Errorf("failed to check container status: %w", err)
 	} else if isRunning {
-		return fmt.Errorf("container already running. Use 'cage attach --worktree=%s' or 'cage stop --worktree=%s'", worktreeName, worktreeName)
+		if config.Verbose {
+			fmt.Fprintf(os.Stderr, "Container already running, connecting to existing container %s\n", containerName)
+		}
+
+		// Get container ID
+		containerID, err := dockerClient.Run("ps", "--filter", fmt.Sprintf("name=%s", containerName), "--format", "{{.ID}}")
+		if err != nil {
+			return fmt.Errorf("failed to get container ID: %w", err)
+		}
+		containerID = strings.TrimSpace(containerID)
+
+		// Exec into existing container
+		cmdPath, err := exec.LookPath(dockerClient.Command())
+		if err != nil {
+			return fmt.Errorf("failed to find docker command: %w", err)
+		}
+
+		// Figure out working directory based on platform
+		var workDir string
+		if fileExists("/proc/version") {
+			workDir = "/workspace"
+		} else {
+			workDir = mountPath
+		}
+
+		execArgs := []string{
+			filepath.Base(cmdPath),
+			"exec",
+			"-it",
+			"-w", workDir,
+			containerID,
+		}
+		execArgs = append(execArgs, config.Command...)
+
+		return syscall.Exec(cmdPath, execArgs, os.Environ())
 	}
 
 	// Step 8: Get current user and detect OS
