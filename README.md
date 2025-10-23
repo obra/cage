@@ -1,5 +1,7 @@
 # Cage
 
+> **⚠️ WARNING: This code is untested and experimental. Use at your own risk. It has not been validated in production environments.**
+
 Cage launches commands (like Claude Code) inside isolated Docker containers with automated worktree and dev container management.
 
 ## Features
@@ -20,7 +22,7 @@ sudo mv cage /usr/local/bin/
 Or install directly:
 
 ```bash
-go install github.com/jessedrelick/cage@latest
+go install github.com/obra/cage@latest
 ```
 
 ## Usage
