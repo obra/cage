@@ -232,7 +232,21 @@ func Run(config *RunConfig) error {
 		}
 	}
 
-	// Step 11: Exec into container with user's command
+	// Step 11: Fix permissions on macOS (mounted volumes appear as vscode user but need write access)
+	if !isLinux {
+		if config.Verbose {
+			fmt.Fprintf(os.Stderr, "Fixing permissions for macOS...\n")
+		}
+		// Run as root to fix permissions on the mounted .claude directory
+		_, err = dockerClient.Run("exec", "-u", "root", containerID, "chown", "-R", "vscode:vscode", "/home/vscode/.claude")
+		if err != nil {
+			if config.Verbose {
+				fmt.Fprintf(os.Stderr, "Warning: failed to fix permissions: %v\n", err)
+			}
+		}
+	}
+
+	// Step 12: Exec into container with user's command
 	cmdPath, err := exec.LookPath(dockerClient.Command())
 	if err != nil {
 		return fmt.Errorf("failed to find docker command: %w", err)
