@@ -83,6 +83,35 @@ func WorktreeExists(worktreeName string) (bool, error) {
 	return false, nil
 }
 
+// GetWorktreePath gets the actual path of an existing worktree
+func GetWorktreePath(worktreeName string) (string, error) {
+	cmd := exec.Command("git", "worktree", "list", "--porcelain")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+
+	// Parse worktree list output
+	// Format is:
+	// worktree <path>
+	// HEAD <sha>
+	// branch refs/heads/<name>
+	// (blank line between entries)
+	lines := strings.Split(string(output), "\n")
+	var currentPath string
+	for _, line := range lines {
+		if strings.HasPrefix(line, "worktree ") {
+			currentPath = strings.TrimPrefix(line, "worktree ")
+		} else if strings.HasPrefix(line, "branch ") {
+			branch := strings.TrimPrefix(line, "branch refs/heads/")
+			if branch == worktreeName {
+				return currentPath, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("worktree '%s' not found", worktreeName)
+}
+
 // CreateWorktree creates a new worktree
 func CreateWorktree(path, branchName string, verbose bool) error {
 	// Check if branch already exists
