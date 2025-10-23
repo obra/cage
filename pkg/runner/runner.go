@@ -286,23 +286,32 @@ func Run(config *RunConfig) error {
 	args = append(args, "-w", workingDir)
 
 	// Add environment variables
-	// Copy host environment, but skip HOME since it points to host path
-	for _, env := range os.Environ() {
-		if strings.HasPrefix(env, "HOME=") {
-			continue
+	// Start with safe baseline - only pass through specific safe variables
+	safeEnvVars := []string{"TERM", "LANG", "LC_ALL", "LC_CTYPE", "COLORTERM"}
+	for _, key := range safeEnvVars {
+		if value := os.Getenv(key); value != "" {
+			args = append(args, "-e", fmt.Sprintf("%s=%s", key, value))
 		}
-		args = append(args, "-e", env)
 	}
 
-	// Set HOME to container user's home directory on all platforms
+	// Set HOME to container user's home directory
 	args = append(args, "-e", fmt.Sprintf("HOME=/home/%s", devConfig.RemoteUser))
 
-	// Add IS_SANDBOX
+	// Add IS_SANDBOX marker
 	args = append(args, "-e", "IS_SANDBOX=1")
 
-	// Add custom env vars
+	// Add user-specified env vars from --env flags
 	for _, env := range config.Env {
-		args = append(args, "-e", env)
+		// Support both --env KEY=value and --env KEY (pass through from host)
+		if strings.Contains(env, "=") {
+			// KEY=value format
+			args = append(args, "-e", env)
+		} else {
+			// KEY format - pass through current value from host
+			if value := os.Getenv(env); value != "" {
+				args = append(args, "-e", fmt.Sprintf("%s=%s", env, value))
+			}
+		}
 	}
 
 	// Add image
