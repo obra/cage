@@ -60,7 +60,8 @@ func Run(config *RunConfig) error {
 			worktreeName = "no-worktree"
 		} else {
 			// Is a git repo
-			if config.Worktree != "" {
+			explicitWorktree := config.Worktree != ""
+			if explicitWorktree {
 				worktreeName = config.Worktree
 			} else {
 				// Auto-detect from current branch
@@ -78,17 +79,26 @@ func Run(config *RunConfig) error {
 			}
 
 			if exists {
-				return fmt.Errorf("worktree '%s' already exists. Use --worktree=%s to connect, or --no-worktree to use directory directly", worktreeName, worktreeName)
-			}
+				// If user explicitly specified the worktree, use the existing one
+				if explicitWorktree {
+					mountPath = git.DetermineWorktreePath(workDir, worktreeName)
+					if config.Verbose {
+						fmt.Fprintf(os.Stderr, "Using existing worktree at %s\n", mountPath)
+					}
+				} else {
+					// Auto-detected worktree exists - error to prevent accidents
+					return fmt.Errorf("worktree '%s' already exists. Use --worktree=%s to connect, or --no-worktree to use directory directly", worktreeName, worktreeName)
+				}
+			} else {
+				// Create worktree
+				mountPath = git.DetermineWorktreePath(workDir, worktreeName)
+				if config.Verbose {
+					fmt.Fprintf(os.Stderr, "Creating worktree at %s\n", mountPath)
+				}
 
-			// Create worktree
-			mountPath = git.DetermineWorktreePath(workDir, worktreeName)
-			if config.Verbose {
-				fmt.Fprintf(os.Stderr, "Creating worktree at %s\n", mountPath)
-			}
-
-			if err := git.CreateWorktree(mountPath, worktreeName, config.Verbose); err != nil {
-				return fmt.Errorf("failed to create worktree: %w", err)
+				if err := git.CreateWorktree(mountPath, worktreeName, config.Verbose); err != nil {
+					return fmt.Errorf("failed to create worktree: %w", err)
+				}
 			}
 		}
 	}
