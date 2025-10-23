@@ -86,17 +86,55 @@ cage list
 3. Supports both `image` (pulls) and `dockerFile` (builds) fields
 4. Auto-pulls/builds images as needed
 
-### Building the Default Container with Claude
+### Building and Publishing the Default Container
 
-To build a custom default container with Claude pre-installed:
+The default container includes Node.js and AI CLI tools (Claude Code, OpenAI Codex, Google Gemini).
+
+**Build the container:**
 
 ```bash
 cd .devcontainer
 docker build -t ghcr.io/obra/cage-default:latest .
-docker push ghcr.io/obra/cage-default:latest  # Requires GitHub authentication
 ```
 
-Then update `pkg/devcontainer/config.go` to use the new image.
+**Test the container:**
+
+```bash
+# Start an interactive shell in the container
+docker run -it --rm ghcr.io/obra/cage-default:latest bash
+
+# Inside the container, verify all tools are installed:
+which node npm
+which claude codex gemini
+node --version
+npm --version
+```
+
+**Push to GitHub Container Registry:**
+
+```bash
+# Login to GHCR (one time setup)
+echo $GITHUB_TOKEN | docker login ghcr.io -u obra --password-stdin
+
+# Or use gh CLI
+gh auth token | docker login ghcr.io -u obra --password-stdin
+
+# Push the image
+docker push ghcr.io/obra/cage-default:latest
+```
+
+**Update cage to use the new default image:**
+
+Edit `pkg/devcontainer/config.go` and change:
+```go
+Image: "ghcr.io/obra/cage-default:latest",
+```
+
+Then rebuild and reinstall cage:
+```bash
+go build -o cage .
+go install
+```
 
 ### File Mounts
 
