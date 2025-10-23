@@ -108,7 +108,12 @@ func Run(config *RunConfig) error {
 			}
 
 			// Get main repo's .git directory for mounting
-			mainRepoGitDir = filepath.Join(workDir, ".git")
+			// Resolve the real path (follow symlinks) to ensure .git paths match
+			realWorkDir, err := filepath.EvalSymlinks(workDir)
+			if err != nil {
+				realWorkDir = workDir // Fallback if can't resolve
+			}
+			mainRepoGitDir = filepath.Join(realWorkDir, ".git")
 		}
 	}
 
