@@ -1,7 +1,7 @@
 package main
 
-import "fmt"
+import "github.com/jessedrelick/cage/cmd"
 
 func main() {
-	fmt.Println("cage")
+	cmd.Execute()
 }
