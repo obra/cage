@@ -66,10 +66,26 @@ func WorktreeExists(worktreeName string) (bool, error) {
 
 // CreateWorktree creates a new worktree
 func CreateWorktree(path, branchName string, verbose bool) error {
-	cmd := exec.Command("git", "worktree", "add", path, "-b", branchName)
+	// Check if branch already exists
+	checkCmd := exec.Command("git", "show-ref", "--verify", "--quiet", fmt.Sprintf("refs/heads/%s", branchName))
+	branchExists := checkCmd.Run() == nil
+
+	var cmd *exec.Cmd
+	if branchExists {
+		// Branch exists, check it out in the worktree
+		cmd = exec.Command("git", "worktree", "add", path, branchName)
+		if verbose {
+			fmt.Fprintf(os.Stderr, "+ git worktree add %s %s\n", path, branchName)
+		}
+	} else {
+		// Branch doesn't exist, create it
+		cmd = exec.Command("git", "worktree", "add", path, "-b", branchName)
+		if verbose {
+			fmt.Fprintf(os.Stderr, "+ git worktree add %s -b %s\n", path, branchName)
+		}
+	}
 
 	if verbose {
-		fmt.Fprintf(os.Stderr, "+ git worktree add %s -b %s\n", path, branchName)
 		cmd.Stdout = os.Stderr
 		cmd.Stderr = os.Stderr
 	}

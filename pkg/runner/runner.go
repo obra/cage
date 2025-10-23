@@ -150,20 +150,33 @@ func Run(config *RunConfig) error {
 		return fmt.Errorf("failed to get current user: %w", err)
 	}
 
-	// Add mounts with idmap
+	// Add mounts with or without idmap based on OS
 	homeDir := currentUser.HomeDir
 
+	// Check if we're on Linux (idmap only supported on Linux)
+	isLinux := os.Getenv("OSTYPE") == "linux-gnu" || fileExists("/proc/version")
+
 	// Mount .claude directory
-	args = append(args, "--mount", fmt.Sprintf(
-		"type=bind,source=%s/.claude,target=/home/%s/.claude,idmap=uids=%s-%s-1000:gids=%s-%s-1000",
-		homeDir, devConfig.RemoteUser, currentUser.Uid, currentUser.Uid, currentUser.Gid, currentUser.Gid,
-	))
+	if isLinux {
+		args = append(args, "--mount", fmt.Sprintf(
+			"type=bind,source=%s/.claude,target=/home/%s/.claude,idmap=uids=%s-%s-1000:gids=%s-%s-1000",
+			homeDir, devConfig.RemoteUser, currentUser.Uid, currentUser.Uid, currentUser.Gid, currentUser.Gid,
+		))
+	} else {
+		// macOS - no idmap support
+		args = append(args, "-v", fmt.Sprintf("%s/.claude:/home/%s/.claude", homeDir, devConfig.RemoteUser))
+	}
 
 	// Mount workspace
-	args = append(args, "--mount", fmt.Sprintf(
-		"type=bind,source=%s,target=/workspace,idmap=uids=%s-%s-1000:gids=%s-%s-1000",
-		mountPath, currentUser.Uid, currentUser.Uid, currentUser.Gid, currentUser.Gid,
-	))
+	if isLinux {
+		args = append(args, "--mount", fmt.Sprintf(
+			"type=bind,source=%s,target=/workspace,idmap=uids=%s-%s-1000:gids=%s-%s-1000",
+			mountPath, currentUser.Uid, currentUser.Uid, currentUser.Gid, currentUser.Gid,
+		))
+	} else {
+		// macOS - no idmap support
+		args = append(args, "-v", fmt.Sprintf("%s:/workspace", mountPath))
+	}
 
 	// Set working directory
 	args = append(args, "-w", "/workspace")
@@ -290,4 +303,9 @@ func containerIsRunning(dockerClient *docker.Client, name string) (bool, error) 
 		return false, err
 	}
 	return strings.TrimSpace(output) == name, nil
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }

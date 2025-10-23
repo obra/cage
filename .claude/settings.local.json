@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /home/jesse/git/claude-launcher/.worktrees/cage-impl add cmd/attach.go)",
+      "Bash(git -C /home/jesse/git/claude-launcher/.worktrees/cage-impl commit -m \"$(cat <<''EOF''\nfeat: implement cage attach command\n\n- Add attach command logic to connect to running containers\n- Require --worktree flag to identify container\n- Use docker exec with /bin/bash for interactive shell\n- Use syscall.Exec for proper interactive mode\n- Check container is running before attempting attach\nEOF\n)\")",
+      "Bash(git -C /home/jesse/git/claude-launcher/.worktrees/cage-impl add cmd/stop.go)",
+      "Bash(git -C /home/jesse/git/claude-launcher/.worktrees/cage-impl commit -m \"$(cat <<''EOF''\nfeat: implement cage stop command\n\n- Add stop command to stop and remove containers\n- Require --worktree flag to identify container\n- Use docker stop followed by docker rm\n- Provide user feedback on stop/remove progress\nEOF\n)\")",
+      "Bash(git -C /home/jesse/git/claude-launcher/.worktrees/cage-impl add cmd/list.go)",
+      "Bash(git -C /home/jesse/git/claude-launcher/.worktrees/cage-impl commit -m \"$(cat <<''EOF''\nfeat: implement cage list command\n\n- Add list command to show cage-managed containers\n- Filter containers by managed-by=cage label\n- Parse JSON output from docker ps\n- Display table with container name, status, project, and worktree\n- Handle empty results gracefully\nEOF\n)\")",
+      "Bash(git -C /home/jesse/git/claude-launcher/.worktrees/cage-impl add:*)",
+      "Bash(git -C /home/jesse/git/claude-launcher/.worktrees/cage-impl commit -m \"$(cat <<''EOF''\nfix: properly handle ~/.claude.json copy and container lifecycle\n\n- Start container in detached mode with sleep infinity\n- Copy ~/.claude.json after container starts\n- Exec into running container with user command\n- Clean up container on copy failure\n- This allows proper file copy before exec replaces process\nEOF\n)\")",
+      "Bash(/home/jesse/git/claude-launcher/.worktrees/cage-impl/cage --help)",
+      "Bash(/home/jesse/git/claude-launcher/.worktrees/cage-impl/cage run --help)",
+      "Bash(/home/jesse/git/claude-launcher/.worktrees/cage-impl/cage attach:*)",
+      "Bash(/home/jesse/git/claude-launcher/.worktrees/cage-impl/cage stop --help)",
+      "Bash(/home/jesse/git/claude-launcher/.worktrees/cage-impl/cage list --help)",
+      "Bash(/home/jesse/git/claude-launcher/.worktrees/cage-impl/cage list)",
+      "Bash(/home/jesse/git/claude-launcher/.worktrees/cage-impl/cage run)",
+      "Bash(/home/jesse/git/claude-launcher/.worktrees/cage-impl/cage stop)",
+      "Bash(git -C /home/jesse/git/claude-launcher/.worktrees/cage-impl commit -m \"docs: add untested warning and update repo to obra/cage\")",
+      "Bash(find:*)",
+      "Bash(git -C /home/jesse/git/claude-launcher/.worktrees/cage-impl commit -m \"refactor: update module path from jessedrelick to obra\n\n- Update go.mod module declaration\n- Update all import statements in Go files\n- Rebuild verified successful\")",
+      "Bash(gh:*)",
+      "Read(//tmp/cage-repo/**)",
+      "Bash(git checkout:*)",
+      "Bash(git merge:*)",
+      "Bash(git remote add:*)",
+      "Bash(git push:*)",
+      "Bash(git branch:*)",
+      "Bash(go env:*)",
+      "Bash(cat:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
