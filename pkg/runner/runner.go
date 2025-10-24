@@ -534,13 +534,8 @@ func getOrCreateContainerCredentialFile(containerName string) (string, error) {
 		xdgDataHome = filepath.Join(homeDir, ".local", "share")
 	}
 
-	credentialsDir := filepath.Join(xdgDataHome, "packnplay", "credentials")
-	if err := os.MkdirAll(credentialsDir, 0755); err != nil {
-		return "", fmt.Errorf("failed to create credentials dir: %w", err)
-	}
-
-	// Create container-specific credential file
-	credentialFile := filepath.Join(credentialsDir, fmt.Sprintf("%s.credentials.json", containerName))
+	// Use /tmp for credentials like we did yesterday (when it worked)
+	credentialFile := filepath.Join("/tmp", fmt.Sprintf("packnplay-credentials-%s.json", containerName))
 
 	// If file doesn't exist, initialize it
 	if !fileExists(credentialFile) {
