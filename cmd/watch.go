@@ -178,6 +178,10 @@ func isDarwin() bool {
 }
 
 func getCredentialsDir() string {
-	// Watch system temp directory where we create credential files
-	return os.TempDir()
+	home, _ := os.UserHomeDir()
+	xdgDataHome := os.Getenv("XDG_DATA_HOME")
+	if xdgDataHome == "" {
+		xdgDataHome = filepath.Join(home, ".local", "share")
+	}
+	return filepath.Join(xdgDataHome, "packnplay", "credentials")
 }
