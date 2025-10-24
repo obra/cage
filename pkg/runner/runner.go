@@ -218,12 +218,24 @@ func Run(config *RunConfig) error {
 	// Mount .claude directory
 	args = append(args, "-v", fmt.Sprintf("%s/.claude:/home/%s/.claude", homeDir, devConfig.RemoteUser))
 
-	// Overlay mount separate credential file on top of .claude mount (enables credential sync across containers)
-	credentialFile, err := getOrCreateContainerCredentialFile(containerName)
-	if err != nil {
-		return fmt.Errorf("failed to get credential file: %w", err)
+	// Only overlay credential file if host doesn't have .credentials.json
+	hostCredFile := filepath.Join(homeDir, ".claude", ".credentials.json")
+	if !fileExists(hostCredFile) {
+		if config.Verbose {
+			fmt.Fprintf(os.Stderr, "Host has no .credentials.json, using container-managed credentials\n")
+		}
+
+		// Overlay mount separate credential file on top of .claude mount (enables credential sync across containers)
+		credentialFile, err := getOrCreateContainerCredentialFile(containerName)
+		if err != nil {
+			return fmt.Errorf("failed to get credential file: %w", err)
+		}
+		args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.claude/.credentials.json", credentialFile, devConfig.RemoteUser))
+	} else {
+		if config.Verbose {
+			fmt.Fprintf(os.Stderr, "Using host .credentials.json (no overlay needed)\n")
+		}
 	}
-	args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.claude/.credentials.json", credentialFile, devConfig.RemoteUser))
 
 	// Mount workspace at /workspace
 	args = append(args, "-v", fmt.Sprintf("%s:/workspace", mountPath))
