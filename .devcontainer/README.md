@@ -6,10 +6,15 @@ This is the default dev container used by packnplay when a project doesn't have 
 
 - Microsoft devcontainer base (Ubuntu)
 - Node.js LTS
+- GitHub CLI (`gh`)
 - AI CLI tools (npm global packages):
   - `@anthropic-ai/claude-code` - Claude Code CLI
   - `@openai/codex` - OpenAI Codex CLI
   - `@google/gemini-cli` - Google Gemini CLI
+  - `@github/copilot` - GitHub Copilot CLI
+  - `@qwen-code/qwen-code` - Qwen Code CLI
+  - `@sourcegraph/amp` - Sourcegraph Amp CLI
+- Cursor CLI (`cursor-agent`) - Installed via curl
 - Git and common utilities
 - User: `vscode` (UID 1000)
 

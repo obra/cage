@@ -49,7 +49,9 @@
       "Read(//tmp/**)",
       "Bash(git clone:*)",
       "WebFetch(domain:support.claude.com)",
-      "WebFetch(domain:docs.z.ai)"
+      "WebFetch(domain:docs.z.ai)",
+      "WebFetch(domain:cursor.com)",
+      "WebFetch(domain:ampcode.com)"
     ],
     "deny": [],
     "ask": []

@@ -28,7 +28,8 @@ func GetSupportedAgents() []Agent {
 		&GeminiAgent{},
 		&CopilotAgent{},
 		&QwenAgent{},
-		&CodeWhispererAgent{},
+		&CursorAgent{},
+		&AmpAgent{},
 		&DeepSeekAgent{},
 	}
 }
@@ -123,20 +124,38 @@ func (q *QwenAgent) GetMounts(homeDir string) []Mount {
 	}
 }
 
-// CodeWhispererAgent implements Amazon CodeWhisperer CLI requirements
-type CodeWhispererAgent struct{}
+// CursorAgent implements Cursor CLI requirements
+type CursorAgent struct{}
 
-func (c *CodeWhispererAgent) Name() string                { return "codewhisperer" }
-func (c *CodeWhispererAgent) ConfigDir() string           { return ".aws" } // Uses AWS config
-func (c *CodeWhispererAgent) DefaultAPIKeyEnv() string    { return "AWS_ACCESS_KEY_ID" }
-func (c *CodeWhispererAgent) RequiresSpecialHandling() bool { return false }
+func (c *CursorAgent) Name() string                { return "cursor" }
+func (c *CursorAgent) ConfigDir() string           { return ".cursor" }
+func (c *CursorAgent) DefaultAPIKeyEnv() string    { return "CURSOR_API_KEY" } // Assuming based on pattern
+func (c *CursorAgent) RequiresSpecialHandling() bool { return false }
 
-func (c *CodeWhispererAgent) GetMounts(homeDir string) []Mount {
+func (c *CursorAgent) GetMounts(homeDir string) []Mount {
 	return []Mount{
 		{
-			HostPath:      filepath.Join(homeDir, ".aws"),
-			ContainerPath: "/home/vscode/.aws",
-			ReadOnly:      true, // AWS config should be read-only for security
+			HostPath:      filepath.Join(homeDir, ".cursor"),
+			ContainerPath: "/home/vscode/.cursor",
+			ReadOnly:      false,
+		},
+	}
+}
+
+// AmpAgent implements Sourcegraph Amp CLI requirements
+type AmpAgent struct{}
+
+func (a *AmpAgent) Name() string                { return "amp" }
+func (a *AmpAgent) ConfigDir() string           { return ".config/amp" } // Uses XDG config
+func (a *AmpAgent) DefaultAPIKeyEnv() string    { return "AMP_API_KEY" }
+func (a *AmpAgent) RequiresSpecialHandling() bool { return false }
+
+func (a *AmpAgent) GetMounts(homeDir string) []Mount {
+	return []Mount{
+		{
+			HostPath:      filepath.Join(homeDir, ".config", "amp"),
+			ContainerPath: "/home/vscode/.config/amp",
+			ReadOnly:      false,
 		},
 	}
 }
@@ -169,9 +188,8 @@ func GetDefaultEnvVars() []string {
 		"GH_TOKEN",       // GitHub Copilot
 		"GITHUB_TOKEN",   // GitHub fallback
 		"QWEN_API_KEY",
-		"AWS_ACCESS_KEY_ID",    // CodeWhisperer
-		"AWS_SECRET_ACCESS_KEY", // CodeWhisperer
-		"AWS_REGION",           // CodeWhisperer
+		"CURSOR_API_KEY",
+		"AMP_API_KEY",
 		"DEEPSEEK_API_KEY",
 	}
 }

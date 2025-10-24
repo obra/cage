@@ -22,7 +22,13 @@ RUN apt-get update && \
 # Install AI CLI tools globally
 RUN npm install -g @anthropic-ai/claude-code \
                    @openai/codex \
-                   @google/gemini-cli
+                   @google/gemini-cli \
+                   @github/copilot \
+                   @qwen-code/qwen-code \
+                   @sourcegraph/amp
+
+# Install Cursor CLI
+RUN curl -fsSL https://cursor.com/install | bash
 
 # Ensure all tools are in PATH for all users
 ENV PATH="/usr/local/bin:${PATH}"

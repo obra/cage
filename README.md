@@ -129,7 +129,8 @@ Pack 'n Play creates git worktrees in XDG-compliant locations for isolation:
 **Default container includes:**
 - Node.js v22 LTS
 - AI CLI tools: Claude Code (`claude`), OpenAI Codex (`codex`), Google Gemini (`gemini`)
-- GitHub CLI (`gh`)
+- GitHub CLI (`gh`) and GitHub Copilot CLI (`copilot`)
+- Qwen Code (`qwen`), Cursor CLI (`cursor-agent`), Sourcegraph Amp (`amp`)
 - Git and common development utilities
 
 ## Rebuilding the Default Container

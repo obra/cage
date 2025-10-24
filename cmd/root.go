@@ -19,9 +19,10 @@ Configuration:
   Worktrees:   ~/.local/share/packnplay/worktrees/
 
 Default container: ghcr.io/obra/packnplay-default:latest
-  Includes: Node.js, Claude Code, OpenAI Codex, Google Gemini, GitHub CLI
+  Includes: Node.js, Claude Code, OpenAI Codex, Google Gemini, GitHub CLI,
+            GitHub Copilot, Qwen Code, Cursor CLI, Sourcegraph Amp
 
-Supported AI agents: claude, codex, gemini, copilot, qwen, codewhisperer, deepseek`,
+Supported AI agents: claude, codex, gemini, copilot, qwen, cursor, amp, deepseek`,
 }
 
 func Execute() {
