@@ -535,8 +535,13 @@ func getOrCreateContainerCredentialFile(containerName string) (string, error) {
 		xdgDataHome = filepath.Join(homeDir, ".local", "share")
 	}
 
-	// Use /tmp for credentials like we did yesterday (when it worked)
-	credentialFile := filepath.Join("/tmp", fmt.Sprintf("packnplay-credentials-%s.json", containerName))
+	// Use system temp directory like yesterday (when overlay mounting worked)
+	tmpFile, err := os.CreateTemp("", fmt.Sprintf("packnplay-credentials-%s-*.json", containerName))
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+	credentialFile := tmpFile.Name()
+	tmpFile.Close() // Close but keep the file
 
 	// If file doesn't exist, initialize it
 	if !fileExists(credentialFile) {
