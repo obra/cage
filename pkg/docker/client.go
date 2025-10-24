@@ -68,6 +68,11 @@ func (c *Client) DetectCLI() (string, error) {
 
 // Run executes a docker command
 func (c *Client) Run(args ...string) (string, error) {
+	// Translate Docker commands to Apple Container CLI if needed
+	if c.cmd == "container" {
+		args = c.translateToAppleContainer(args)
+	}
+
 	cmd := exec.Command(c.cmd, args...)
 
 	if c.verbose {
@@ -81,6 +86,22 @@ func (c *Client) Run(args ...string) (string, error) {
 	}
 
 	return string(output), err
+}
+
+// translateToAppleContainer translates Docker CLI args to Apple Container CLI
+func (c *Client) translateToAppleContainer(args []string) []string {
+	if len(args) == 0 {
+		return args
+	}
+
+	// Translate: ps -> ls
+	if args[0] == "ps" {
+		newArgs := []string{"ls"}
+		newArgs = append(newArgs, args[1:]...)
+		return newArgs
+	}
+
+	return args
 }
 
 // Command returns the docker command being used
