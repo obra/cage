@@ -140,9 +140,7 @@ func Run(config *RunConfig) error {
 	labels := container.GenerateLabels(projectName, worktreeName)
 
 	// Step 7: Check if container already running - if so, just exec into it
-	// Also check if stopped container exists (Apple Container requires deletion first)
-	isAppleRuntime := dockerClient.Command() == "container"
-
+	// Also remove any stopped containers with same name
 	if isRunning, err := containerIsRunning(dockerClient, containerName); err != nil {
 		return fmt.Errorf("failed to check container status: %w", err)
 	} else if isRunning {
@@ -175,14 +173,12 @@ func Run(config *RunConfig) error {
 		return syscall.Exec(cmdPath, execArgs, os.Environ())
 	}
 
-	// For Apple Container, remove stopped containers with same name (can't reuse IDs)
-	if isAppleRuntime {
-		if config.Verbose {
-			fmt.Fprintf(os.Stderr, "Checking for stopped container with same name...\n")
-		}
-		// Try to delete - will fail silently if doesn't exist
-		_, _ = dockerClient.Run("rm", containerName)
+	// Remove any stopped containers with same name (required for clean start)
+	if config.Verbose {
+		fmt.Fprintf(os.Stderr, "Checking for stopped container with same name...\n")
 	}
+	// Try to remove - ignore errors if container doesn't exist
+	_, _ = dockerClient.Run("rm", containerName)
 
 	// Step 8: Get current user and detect OS
 	currentUser, err := user.Current()
