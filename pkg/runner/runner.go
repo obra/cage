@@ -187,24 +187,43 @@ func Run(config *RunConfig) error {
 	// Check if we're on Linux (idmap only supported on Linux)
 	isLinux := os.Getenv("OSTYPE") == "linux-gnu" || fileExists("/proc/version")
 
-	// On macOS, extract credentials from Keychain and create temp file
+	// On macOS, extract credentials from Keychain and create temp files
 	var credentialsTempFile string
+	var ghHostsYmlTempFile string
+
 	if !isLinux {
+		// Extract Claude credentials
 		creds, err := getClaudeCredentialsFromKeychain()
 		if err != nil {
 			if config.Verbose {
-				fmt.Fprintf(os.Stderr, "Warning: Could not get credentials from Keychain: %v\n", err)
+				fmt.Fprintf(os.Stderr, "Warning: Could not get Claude credentials from Keychain: %v\n", err)
 			}
 		} else {
 			credentialsTempFile, err = createCredentialsTempFile(creds)
 			if err != nil {
 				return fmt.Errorf("failed to create credentials temp file: %w", err)
 			}
-			// Clean up temp file when done
 			defer os.Remove(credentialsTempFile)
 
 			if config.Verbose {
-				fmt.Fprintf(os.Stderr, "Created credentials temp file: %s\n", credentialsTempFile)
+				fmt.Fprintf(os.Stderr, "Created Claude credentials temp file: %s\n", credentialsTempFile)
+			}
+		}
+
+		// Extract GH credentials if enabled
+		if config.Credentials.GH {
+			ghTempFile, err := createGHHostsYmlFromKeychain(currentUser.HomeDir, config.Verbose)
+			if err != nil {
+				if config.Verbose {
+					fmt.Fprintf(os.Stderr, "Warning: Could not create gh hosts.yml from Keychain: %v\n", err)
+				}
+			} else {
+				ghHostsYmlTempFile = ghTempFile
+				defer os.Remove(ghHostsYmlTempFile)
+
+				if config.Verbose {
+					fmt.Fprintf(os.Stderr, "Created gh hosts.yml temp file: %s\n", ghHostsYmlTempFile)
+				}
 			}
 		}
 	}
@@ -257,10 +276,15 @@ func Run(config *RunConfig) error {
 	}
 
 	if config.Credentials.GH {
-		// Mount GitHub CLI config directory
-		ghConfigPath := filepath.Join(homeDir, ".config", "gh")
-		if fileExists(ghConfigPath) {
-			args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.config/gh:ro", ghConfigPath, devConfig.RemoteUser))
+		if !isLinux && ghHostsYmlTempFile != "" {
+			// macOS - mount temp hosts.yml with token from Keychain
+			args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.config/gh/hosts.yml:ro", ghHostsYmlTempFile, devConfig.RemoteUser))
+		} else {
+			// Linux - mount entire gh config directory (has hosts.yml with token)
+			ghConfigPath := filepath.Join(homeDir, ".config", "gh")
+			if fileExists(ghConfigPath) {
+				args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.config/gh:ro", ghConfigPath, devConfig.RemoteUser))
+			}
 		}
 	}
 
@@ -454,6 +478,21 @@ func getClaudeCredentialsFromKeychain() (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
+// getGHCredentialsFromKeychain extracts GitHub CLI credentials from macOS Keychain
+func getGHCredentialsFromKeychain(username string) (string, error) {
+	cmd := exec.Command("security", "find-generic-password",
+		"-s", "gh:github.com",
+		"-a", username,
+		"-w")
+
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to get gh credentials from keychain: %w", err)
+	}
+
+	return strings.TrimSpace(string(output)), nil
+}
+
 // createCredentialsTempFile creates a temporary file with credentials (mode 600)
 func createCredentialsTempFile(credentials string) (string, error) {
 	tmpFile, err := os.CreateTemp("", "cage-credentials-*.json")
@@ -473,6 +512,67 @@ func createCredentialsTempFile(credentials string) (string, error) {
 		tmpFile.Close()
 		os.Remove(tmpFile.Name())
 		return "", fmt.Errorf("failed to write credentials: %w", err)
+	}
+
+	if err := tmpFile.Close(); err != nil {
+		os.Remove(tmpFile.Name())
+		return "", fmt.Errorf("failed to close temp file: %w", err)
+	}
+
+	return tmpFile.Name(), nil
+}
+
+// createGHHostsYmlFromKeychain creates a gh hosts.yml with token from Keychain
+func createGHHostsYmlFromKeychain(homeDir string, verbose bool) (string, error) {
+	// Read existing hosts.yml to get username
+	hostsYmlPath := filepath.Join(homeDir, ".config", "gh", "hosts.yml")
+	hostsData, err := os.ReadFile(hostsYmlPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read hosts.yml: %w", err)
+	}
+
+	// Parse to extract username (simple YAML parsing for "user: <username>")
+	var username string
+	for _, line := range strings.Split(string(hostsData), "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "user:") {
+			username = strings.TrimSpace(strings.TrimPrefix(line, "user:"))
+			break
+		}
+	}
+
+	if username == "" {
+		return "", fmt.Errorf("could not find user in hosts.yml")
+	}
+
+	// Get token from Keychain
+	token, err := getGHCredentialsFromKeychain(username)
+	if err != nil {
+		return "", err
+	}
+
+	// Create temp hosts.yml with the token
+	hostsContent := fmt.Sprintf(`github.com:
+    user: %s
+    oauth_token: %s
+    git_protocol: https
+`, username, token)
+
+	tmpFile, err := os.CreateTemp("", "cage-gh-hosts-*.yml")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+
+	if err := tmpFile.Chmod(0600); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return "", fmt.Errorf("failed to set file permissions: %w", err)
+	}
+
+	if _, err := tmpFile.WriteString(hostsContent); err != nil {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return "", fmt.Errorf("failed to write hosts.yml: %w", err)
 	}
 
 	if err := tmpFile.Close(); err != nil {
