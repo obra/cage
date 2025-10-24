@@ -42,7 +42,9 @@
       "Bash(git remote set-url:*)",
       "Bash(make help:*)",
       "Bash(make test:*)",
-      "Bash(make build:*)"
+      "Bash(make build:*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ],
     "deny": [],
     "ask": []

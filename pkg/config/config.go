@@ -205,7 +205,9 @@ func interactiveSetup(configPath string) (*Config, error) {
 
 // detectAvailableRuntimes finds which container runtimes are installed
 func detectAvailableRuntimes() []string {
-	runtimes := []string{"docker", "podman", "container"}
+	// Note: Apple Container support disabled due to incompatibilities
+	// See: https://github.com/obra/packnplay/issues/1
+	runtimes := []string{"docker", "podman"}
 	var available []string
 
 	for _, runtime := range runtimes {

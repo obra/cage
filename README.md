@@ -201,8 +201,11 @@ Created interactively on first run. Edit manually or delete to reconfigure.
 ### Environment Variables
 
 - `DOCKER_CMD`: Override docker command (e.g., `DOCKER_CMD=podman packnplay run ...`)
+
 - `XDG_DATA_HOME`: Override data directory (default: `~/.local/share`)
 - `XDG_CONFIG_HOME`: Override config directory (default: `~/.config`)
+
+**Note:** Apple Container support was disabled due to incompatibilities. See [issue #1](https://github.com/obra/packnplay/issues/1) for details. Use Docker Desktop or Podman on macOS.
 
 ## Examples
 

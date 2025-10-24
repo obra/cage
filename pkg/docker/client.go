@@ -55,15 +55,16 @@ func (c *Client) DetectCLI() (string, error) {
 		return envCmd, nil
 	}
 
-	// Try in order: docker, podman, container
-	runtimes := []string{"docker", "podman", "container"}
+	// Try in order: docker, podman
+	// Note: Apple Container support disabled due to incompatibilities
+	runtimes := []string{"docker", "podman"}
 	for _, runtime := range runtimes {
 		if _, err := exec.LookPath(runtime); err == nil {
 			return runtime, nil
 		}
 	}
 
-	return "", fmt.Errorf("no container runtime found (tried: docker, podman, container)")
+	return "", fmt.Errorf("no container runtime found (tried: docker, podman)")
 }
 
 // Run executes a docker command
