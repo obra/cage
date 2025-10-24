@@ -41,9 +41,13 @@ func LoadConfig(projectPath string) (*Config, error) {
 }
 
 // GetDefaultConfig returns the default devcontainer config
-func GetDefaultConfig() *Config {
+// If defaultImage is empty, uses "ghcr.io/obra/packnplay-default:latest"
+func GetDefaultConfig(defaultImage string) *Config {
+	if defaultImage == "" {
+		defaultImage = "ghcr.io/obra/packnplay-default:latest"
+	}
 	return &Config{
-		Image:      "ghcr.io/obra/packnplay-default:latest",
+		Image:      defaultImage,
 		RemoteUser: "vscode",
 	}
 }

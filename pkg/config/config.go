@@ -12,10 +12,11 @@ import (
 
 // Config represents packnplay's configuration
 type Config struct {
-	ContainerRuntime   string                 `json:"container_runtime"`   // docker, podman, or container
-	DefaultCredentials Credentials            `json:"default_credentials"`
-	DefaultEnvVars     []string               `json:"default_env_vars"`    // API keys to always proxy
-	EnvConfigs         map[string]EnvConfig   `json:"env_configs"`
+	ContainerRuntime   string               `json:"container_runtime"` // docker, podman, or container
+	DefaultImage       string               `json:"default_image"`     // default container image to use
+	DefaultCredentials Credentials          `json:"default_credentials"`
+	DefaultEnvVars     []string             `json:"default_env_vars"` // API keys to always proxy
+	EnvConfigs         map[string]EnvConfig `json:"env_configs"`
 }
 
 // EnvConfig defines environment variables for different setups (API configs, etc.)
@@ -70,6 +71,11 @@ func Load() (*Config, error) {
 		return interactiveSetup(configPath)
 	}
 
+	// Set default image if not configured (backward compatibility)
+	if cfg.DefaultImage == "" {
+		cfg.DefaultImage = "ghcr.io/obra/packnplay-default:latest"
+	}
+
 	return &cfg, nil
 }
 
@@ -91,6 +97,11 @@ func LoadWithoutRuntimeCheck() (*Config, error) {
 	var cfg Config
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
+	}
+
+	// Set default image if not configured (backward compatibility)
+	if cfg.DefaultImage == "" {
+		cfg.DefaultImage = "ghcr.io/obra/packnplay-default:latest"
 	}
 
 	return &cfg, nil
@@ -197,6 +208,7 @@ func interactiveSetup(configPath string) (*Config, error) {
 
 	cfg := &Config{
 		ContainerRuntime: selectedRuntime,
+		DefaultImage:     "ghcr.io/obra/packnplay-default:latest",
 		DefaultCredentials: Credentials{
 			Git: true, // Always copy .gitconfig (it's config, not credentials)
 			SSH: sshCreds,
@@ -246,4 +258,3 @@ func detectAvailableRuntimes() []string {
 
 	return available
 }
-

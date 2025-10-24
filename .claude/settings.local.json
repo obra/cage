@@ -51,7 +51,9 @@
       "WebFetch(domain:support.claude.com)",
       "WebFetch(domain:docs.z.ai)",
       "WebFetch(domain:cursor.com)",
-      "WebFetch(domain:ampcode.com)"
+      "WebFetch(domain:ampcode.com)",
+      "Bash(go build:*)",
+      "Bash(go test:*)"
     ],
     "deny": [],
     "ask": []
