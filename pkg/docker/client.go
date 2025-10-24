@@ -94,8 +94,9 @@ func (c *Client) translateToAppleContainer(args []string) []string {
 		return args
 	}
 
-	// Translate: ps -> ls
-	if args[0] == "ps" {
+	switch args[0] {
+	case "ps":
+		// Translate: ps -> ls (list)
 		newArgs := []string{"ls"}
 
 		// Apple Container doesn't support --filter or Go template format
@@ -117,6 +118,31 @@ func (c *Client) translateToAppleContainer(args []string) []string {
 		// Always use json format for Apple Container
 		newArgs = append(newArgs, "--format", "json")
 		return newArgs
+
+	case "rm":
+		// Translate: rm -> delete
+		newArgs := []string{"delete"}
+		newArgs = append(newArgs, args[1:]...)
+		return newArgs
+
+	case "pull":
+		// Translate: pull -> image pull
+		newArgs := []string{"image", "pull"}
+		newArgs = append(newArgs, args[1:]...)
+		return newArgs
+
+	case "build":
+		// build stays as build (no translation needed)
+		return args
+
+	case "image":
+		// image commands need special handling
+		if len(args) > 1 && args[1] == "inspect" {
+			// image inspect -> images ls with filter by name
+			// For now, keep as-is and handle in response parsing
+			return args
+		}
+		return args
 	}
 
 	return args
