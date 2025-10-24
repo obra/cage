@@ -344,6 +344,7 @@ func Run(config *RunConfig) error {
 	// Step 9: Start container in background
 	if config.Verbose {
 		fmt.Fprintf(os.Stderr, "Starting container %s\n", containerName)
+		fmt.Fprintf(os.Stderr, "Full command: docker %v\n", args)
 	}
 
 	containerID, err := dockerClient.Run(args...)
