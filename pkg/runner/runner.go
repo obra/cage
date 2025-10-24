@@ -223,7 +223,14 @@ func Run(config *RunConfig) error {
 	}
 
 	// Build docker run command for background container
-	args := []string{"run", "-d", "-it"} // -d for detached, keep -it for interactive
+	// Apple Container doesn't support -it with -d (detached mode)
+	isApple := currentUser.HomeDir != "" && !isLinux && dockerClient.Command() == "container"
+	var args []string
+	if isApple {
+		args = []string{"run", "-d"}
+	} else {
+		args = []string{"run", "-d", "-it"} // -d for detached, keep -it for interactive
+	}
 
 	// Add labels
 	args = append(args, container.LabelsToArgs(labels)...)
