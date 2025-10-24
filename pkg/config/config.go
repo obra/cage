@@ -120,7 +120,11 @@ func interactiveSetup(configPath string) (*Config, error) {
 	}
 
 	var selectedRuntime string
-	var gitCreds, sshCreds, ghCreds, gpgCreds, npmCreds, saveConfig bool
+	var sshCreds, ghCreds, gpgCreds, npmCreds, saveConfig bool
+
+	// Set sensible defaults - SSH and auth credentials should be user choice
+	// Git config is just identity info, not credentials
+	saveConfig = true
 
 	// Build runtime selection options
 	runtimeOptions := make([]huh.Option[string], len(available))
@@ -137,15 +141,8 @@ func interactiveSetup(configPath string) (*Config, error) {
 				Options(runtimeOptions...).
 				Value(&selectedRuntime),
 		),
-		// Second group: Credentials
+		// Second group: Credentials (SSH and auth tokens only)
 		huh.NewGroup(
-			huh.NewConfirm().
-				Title("Enable git credentials?").
-				Description("Mounts ~/.gitconfig (read-only) for git user configuration").
-				Value(&gitCreds).
-				Affirmative("Yes").
-				Negative("No"),
-
 			huh.NewConfirm().
 				Title("Enable SSH keys?").
 				Description("Mounts ~/.ssh (read-only) for SSH authentication to servers and repos").
@@ -192,7 +189,7 @@ func interactiveSetup(configPath string) (*Config, error) {
 	cfg := &Config{
 		ContainerRuntime: selectedRuntime,
 		DefaultCredentials: Credentials{
-			Git: gitCreds,
+			Git: true, // Always copy .gitconfig (it's config, not credentials)
 			SSH: sshCreds,
 			GH:  ghCreds,
 			GPG: gpgCreds,
