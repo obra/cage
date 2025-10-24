@@ -260,10 +260,8 @@ func Run(config *RunConfig) error {
 	// Mount .claude directory
 	args = append(args, "-v", fmt.Sprintf("%s/.claude:/home/%s/.claude", homeDir, devConfig.RemoteUser))
 
-	// macOS only: Mount credentials file if we extracted it from Keychain
-	if !isLinux && credentialsTempFile != "" {
-		args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.claude/.credentials.json:ro", credentialsTempFile, devConfig.RemoteUser))
-	}
+	// Note: Claude credentials from Keychain are copied in after container starts (not mounted)
+	// Apple Container doesn't support single file mounts reliably
 
 	// Mount workspace at /workspace
 	args = append(args, "-v", fmt.Sprintf("%s:/workspace", mountPath))
@@ -378,6 +376,22 @@ func Run(config *RunConfig) error {
 		if err := copyFileToContainer(dockerClient, containerID, claudeConfigSrc, fmt.Sprintf("/home/%s/.claude.json", devConfig.RemoteUser), devConfig.RemoteUser, config.Verbose); err != nil {
 			dockerClient.Run("rm", "-f", containerID)
 			return fmt.Errorf("failed to copy .claude.json: %w", err)
+		}
+	}
+
+	// Copy Claude credentials from Keychain if extracted (macOS only)
+	// Copy to /tmp (not inside .claude mount) to avoid exposing on host
+	if !isLinux && credentialsTempFile != "" {
+		if err := copyFileToContainer(dockerClient, containerID, credentialsTempFile, "/tmp/.claude-credentials.json", devConfig.RemoteUser, config.Verbose); err != nil {
+			if config.Verbose {
+				fmt.Fprintf(os.Stderr, "Warning: failed to copy Claude credentials: %v\n", err)
+			}
+		} else {
+			// Create symlink from expected location to /tmp
+			_, err = dockerClient.Run("exec", containerID, "ln", "-sf", "/tmp/.claude-credentials.json", fmt.Sprintf("/home/%s/.claude/.credentials.json", devConfig.RemoteUser))
+			if err != nil && config.Verbose {
+				fmt.Fprintf(os.Stderr, "Warning: failed to create credentials symlink: %v\n", err)
+			}
 		}
 	}
 
