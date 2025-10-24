@@ -98,11 +98,16 @@ func (c *Client) translateToAppleContainer(args []string) []string {
 	if args[0] == "ps" {
 		newArgs := []string{"ls"}
 
-		// Apple Container doesn't support Go template format
-		// Translate --format {{.Field}} to --format json
+		// Apple Container doesn't support --filter or Go template format
+		// Remove --filter and --format args, use --format json instead
 		for i := 1; i < len(args); i++ {
+			if args[i] == "--filter" && i+1 < len(args) {
+				// Skip --filter and its value
+				i++
+				continue
+			}
 			if args[i] == "--format" && i+1 < len(args) {
-				// Skip the template format, we'll add json
+				// Skip --format and its template value
 				i++
 				continue
 			}

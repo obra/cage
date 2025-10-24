@@ -437,15 +437,26 @@ func ensureImage(dockerClient *docker.Client, config *devcontainer.Config, proje
 }
 
 func containerIsRunning(dockerClient *docker.Client, name string) (bool, error) {
-	output, err := dockerClient.Run("ps", "--filter", fmt.Sprintf("name=%s", name), "--format", "{{.Names}}")
+	// Apple Container doesn't support --filter, so get all and filter client-side
+	isApple := dockerClient.Command() == "container"
+
+	var output string
+	var err error
+
+	if isApple {
+		output, err = dockerClient.Run("ps", "--format", "json")
+	} else {
+		output, err = dockerClient.Run("ps", "--filter", fmt.Sprintf("name=%s", name), "--format", "{{.Names}}")
+	}
+
 	if err != nil {
 		return false, err
 	}
 
-	// For Apple Container, output is JSON array - check if container with name exists
-	if strings.HasPrefix(strings.TrimSpace(output), "[") {
-		// JSON output - parse it
-		return strings.Contains(output, fmt.Sprintf(`"name":"%s"`, name)), nil
+	// For Apple Container, output is JSON array
+	if isApple {
+		// Check if any container has matching ID (Apple uses "id" field, not "name")
+		return strings.Contains(output, fmt.Sprintf(`"id":"%s"`, name)), nil
 	}
 
 	// Docker/Podman - simple name matching
@@ -454,26 +465,29 @@ func containerIsRunning(dockerClient *docker.Client, name string) (bool, error) 
 
 // getContainerID gets the container ID by name
 func getContainerID(dockerClient *docker.Client, name string) (string, error) {
-	output, err := dockerClient.Run("ps", "--filter", fmt.Sprintf("name=%s", name), "--format", "{{.ID}}")
+	isApple := dockerClient.Command() == "container"
+
+	var output string
+	var err error
+
+	if isApple {
+		output, err = dockerClient.Run("ps", "--format", "json")
+	} else {
+		output, err = dockerClient.Run("ps", "--filter", fmt.Sprintf("name=%s", name), "--format", "{{.ID}}")
+	}
+
 	if err != nil {
 		return "", err
 	}
 
-	// For Apple Container, output is JSON array - extract ID
-	if strings.HasPrefix(strings.TrimSpace(output), "[") {
-		// JSON output - parse to find ID
-		// Simple parsing: look for "id":"<value>"
-		idPrefix := `"id":"`
-		startIdx := strings.Index(output, idPrefix)
-		if startIdx == -1 {
-			return "", fmt.Errorf("container not found in output")
+	// For Apple Container, search for container with matching ID in JSON
+	if isApple {
+		idPrefix := fmt.Sprintf(`"id":"%s"`, name)
+		if !strings.Contains(output, idPrefix) {
+			return "", fmt.Errorf("container not found")
 		}
-		startIdx += len(idPrefix)
-		endIdx := strings.Index(output[startIdx:], `"`)
-		if endIdx == -1 {
-			return "", fmt.Errorf("malformed JSON")
-		}
-		return output[startIdx : startIdx+endIdx], nil
+		// Container name IS the ID in Apple Container
+		return name, nil
 	}
 
 	// Docker/Podman - ID in output
