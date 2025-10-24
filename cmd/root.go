@@ -21,7 +21,7 @@ Configuration:
 Default container: ghcr.io/obra/packnplay-default:latest
   Includes: Node.js, Claude Code, OpenAI Codex, Google Gemini, GitHub CLI
 
-Supported AI agents: claude, codex, gemini`,
+Supported AI agents: claude, codex, gemini, copilot, qwen, codewhisperer, deepseek`,
 }
 
 func Execute() {

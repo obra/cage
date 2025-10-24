@@ -261,12 +261,17 @@ func Run(config *RunConfig) error {
 	// Mount workspace at /workspace
 	args = append(args, "-v", fmt.Sprintf("%s:/workspace", mountPath))
 
-	// Mount AI agent config directories (.codex, .gemini) if they exist
-	agentConfigDirs := []string{".codex", ".gemini"}
+	// Mount AI agent config directories if they exist
+	agentConfigDirs := []string{".codex", ".gemini", ".copilot", ".qwen", ".aws", ".deepseek"}
 	for _, configDir := range agentConfigDirs {
 		agentPath := filepath.Join(homeDir, configDir)
 		if fileExists(agentPath) {
-			args = append(args, "-v", fmt.Sprintf("%s:/home/%s/%s", agentPath, devConfig.RemoteUser, configDir))
+			// AWS config should be read-only for security
+			readOnly := ""
+			if configDir == ".aws" {
+				readOnly = ":ro"
+			}
+			args = append(args, "-v", fmt.Sprintf("%s:/home/%s/%s%s", agentPath, devConfig.RemoteUser, configDir, readOnly))
 			if config.Verbose {
 				fmt.Fprintf(os.Stderr, "Mounting %s config directory\n", configDir)
 			}

@@ -209,6 +209,13 @@ func interactiveSetup(configPath string) (*Config, error) {
 			"OPENAI_API_KEY",
 			"GEMINI_API_KEY",
 			"GOOGLE_API_KEY",
+			"GH_TOKEN",
+			"GITHUB_TOKEN",
+			"QWEN_API_KEY",
+			"AWS_ACCESS_KEY_ID",
+			"AWS_SECRET_ACCESS_KEY",
+			"AWS_REGION",
+			"DEEPSEEK_API_KEY",
 		},
 		EnvConfigs: make(map[string]EnvConfig),
 	}
