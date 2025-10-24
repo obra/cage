@@ -83,7 +83,8 @@ Override default credential settings per-invocation:
 
 ```bash
 # Enable specific credentials
-packnplay run --git-creds claude           # Mount git config and SSH keys
+packnplay run --git-creds claude           # Mount git config (~/.gitconfig)
+packnplay run --ssh-creds claude           # Mount SSH keys (~/.ssh)
 packnplay run --gh-creds claude            # Mount GitHub CLI credentials
 packnplay run --gpg-creds claude           # Mount GPG keys for signing
 packnplay run --npm-creds claude           # Mount npm credentials
@@ -139,7 +140,8 @@ See [.devcontainer/README.md](.devcontainer/README.md) for instructions on build
 On first run, packnplay prompts you to choose which credentials to enable by default using a beautiful terminal UI.
 
 **Credentials are mounted read-only for security:**
-- **Git**: `~/.gitconfig` and `~/.ssh` (for git operations and SSH keys)
+- **Git**: `~/.gitconfig` (git user configuration)
+- **SSH**: `~/.ssh` (SSH keys for authentication to servers and repos)
 - **GitHub CLI**: `~/.config/gh` (copied from Keychain on macOS, mounted on Linux)
 - **GPG**: `~/.gnupg` (for commit signing)
 - **npm**: `~/.npmrc` (for authenticated package operations)
@@ -187,8 +189,10 @@ On first run, packnplay prompts you to choose which credentials to enable by def
 
 ```json
 {
+  "container_runtime": "docker",
   "default_credentials": {
     "git": true,
+    "ssh": true,
     "gh": true,
     "gpg": false,
     "npm": false

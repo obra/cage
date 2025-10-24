@@ -18,7 +18,8 @@ type Config struct {
 
 // Credentials specifies which credentials to mount
 type Credentials struct {
-	Git bool `json:"git"` // ~/.gitconfig and ~/.ssh
+	Git bool `json:"git"` // ~/.gitconfig
+	SSH bool `json:"ssh"` // ~/.ssh keys
 	GH  bool `json:"gh"`  // GitHub CLI credentials
 	GPG bool `json:"gpg"` // GPG keys for commit signing
 	NPM bool `json:"npm"` // npm credentials
@@ -119,7 +120,7 @@ func interactiveSetup(configPath string) (*Config, error) {
 	}
 
 	var selectedRuntime string
-	var gitCreds, ghCreds, gpgCreds, npmCreds, saveConfig bool
+	var gitCreds, sshCreds, ghCreds, gpgCreds, npmCreds, saveConfig bool
 
 	// Build runtime selection options
 	runtimeOptions := make([]huh.Option[string], len(available))
@@ -140,8 +141,15 @@ func interactiveSetup(configPath string) (*Config, error) {
 		huh.NewGroup(
 			huh.NewConfirm().
 				Title("Enable git credentials?").
-				Description("Mounts ~/.gitconfig (read-only) and ~/.ssh (read-only) for git operations").
+				Description("Mounts ~/.gitconfig (read-only) for git user configuration").
 				Value(&gitCreds).
+				Affirmative("Yes").
+				Negative("No"),
+
+			huh.NewConfirm().
+				Title("Enable SSH keys?").
+				Description("Mounts ~/.ssh (read-only) for SSH authentication to servers and repos").
+				Value(&sshCreds).
 				Affirmative("Yes").
 				Negative("No"),
 
@@ -185,6 +193,7 @@ func interactiveSetup(configPath string) (*Config, error) {
 		ContainerRuntime: selectedRuntime,
 		DefaultCredentials: Credentials{
 			Git: gitCreds,
+			SSH: sshCreds,
 			GH:  ghCreds,
 			GPG: gpgCreds,
 			NPM: npmCreds,

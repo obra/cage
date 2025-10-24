@@ -272,23 +272,19 @@ func Run(config *RunConfig) error {
 		args = append(args, "-v", fmt.Sprintf("%s:%s", mainRepoGitDir, mainRepoGitDir))
 	}
 
-	// Mount credentials based on configuration
+	// Mount git config
 	if config.Credentials.Git {
-		if isAppleRuntime {
-			// Apple Container: use built-in --ssh flag for SSH auth socket forwarding
-			// This is better than mounting .ssh - it auto-updates on session restart
-			args = append(args, "--ssh")
-			// .gitconfig will be copied after container starts (no single file mounts)
-		} else {
-			// Docker/Podman: mount .gitconfig and .ssh
-			gitconfigPath := filepath.Join(homeDir, ".gitconfig")
-			if fileExists(gitconfigPath) {
-				args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.gitconfig:ro", gitconfigPath, devConfig.RemoteUser))
-			}
-			sshPath := filepath.Join(homeDir, ".ssh")
-			if fileExists(sshPath) {
-				args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.ssh:ro", sshPath, devConfig.RemoteUser))
-			}
+		gitconfigPath := filepath.Join(homeDir, ".gitconfig")
+		if fileExists(gitconfigPath) {
+			args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.gitconfig:ro", gitconfigPath, devConfig.RemoteUser))
+		}
+	}
+
+	// Mount SSH keys
+	if config.Credentials.SSH {
+		sshPath := filepath.Join(homeDir, ".ssh")
+		if fileExists(sshPath) {
+			args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.ssh:ro", sshPath, devConfig.RemoteUser))
 		}
 	}
 

@@ -18,6 +18,7 @@ var (
 	runRuntime    string
 	// Credential flags
 	runGitCreds   *bool
+	runSSHCreds   *bool
 	runGHCreds    *bool
 	runGPGCreds   *bool
 	runNPMCreds   *bool
@@ -44,6 +45,7 @@ var runCmd = &cobra.Command{
 					ContainerRuntime: runRuntime,
 					DefaultCredentials: config.Credentials{
 						Git: true, // Sensible defaults
+						SSH: true,
 						GH:  true,
 					},
 				}
@@ -63,6 +65,9 @@ var runCmd = &cobra.Command{
 		if cmd.Flags().Changed("git-creds") {
 			creds.Git = *runGitCreds
 		}
+		if cmd.Flags().Changed("ssh-creds") {
+			creds.SSH = *runSSHCreds
+		}
 		if cmd.Flags().Changed("gh-creds") {
 			creds.GH = *runGHCreds
 		}
@@ -74,6 +79,7 @@ var runCmd = &cobra.Command{
 		}
 		if runAllCreds {
 			creds.Git = true
+			creds.SSH = true
 			creds.GH = true
 			creds.GPG = true
 			creds.NPM = true
@@ -120,7 +126,8 @@ func init() {
 	runCmd.Flags().BoolVar(&runVerbose, "verbose", false, "Show all docker/git commands")
 
 	// Credential flags (use pointers so we can detect if they were explicitly set)
-	runGitCreds = runCmd.Flags().Bool("git-creds", false, "Mount git credentials (~/.gitconfig, ~/.ssh)")
+	runGitCreds = runCmd.Flags().Bool("git-creds", false, "Mount git config (~/.gitconfig)")
+	runSSHCreds = runCmd.Flags().Bool("ssh-creds", false, "Mount SSH keys (~/.ssh)")
 	runGHCreds = runCmd.Flags().Bool("gh-creds", false, "Mount GitHub CLI credentials")
 	runGPGCreds = runCmd.Flags().Bool("gpg-creds", false, "Mount GPG credentials for commit signing")
 	runNPMCreds = runCmd.Flags().Bool("npm-creds", false, "Mount npm credentials")
