@@ -23,6 +23,7 @@ type RunConfig struct {
 	Env            []string
 	Verbose        bool
 	Runtime        string // docker, podman, or container
+	Reconnect      bool   // Allow reconnecting to existing containers
 	Command        []string
 	Credentials    config.Credentials
 	DefaultEnvVars []string // API keys to proxy from host
@@ -140,13 +141,42 @@ func Run(config *RunConfig) error {
 	containerName := container.GenerateContainerName(workDir, worktreeName)
 	labels := container.GenerateLabels(projectName, worktreeName)
 
-	// Step 7: Check if container already running - if so, just exec into it
-	// Also remove any stopped containers with same name
+	// Step 7: Check if container already running
 	if isRunning, err := containerIsRunning(dockerClient, containerName); err != nil {
 		return fmt.Errorf("failed to check container status: %w", err)
 	} else if isRunning {
+		// Container is running - check if user wants to reconnect
+		if !config.Reconnect {
+			// Error with helpful message
+			worktreeFlag := ""
+			if worktreeName != "no-worktree" {
+				worktreeFlag = fmt.Sprintf(" --worktree=%s", worktreeName)
+			}
+
+			var cmdStr strings.Builder
+			for i, arg := range config.Command {
+				if i > 0 {
+					cmdStr.WriteString(" ")
+				}
+				if strings.Contains(arg, " ") {
+					cmdStr.WriteString(fmt.Sprintf("'%s'", arg))
+				} else {
+					cmdStr.WriteString(arg)
+				}
+			}
+
+			return fmt.Errorf(`container already running for this worktree
+
+To run your command in the existing container:
+  packnplay run%s --reconnect %s
+
+To stop the existing container:
+  packnplay stop%s`, worktreeFlag, cmdStr.String(), worktreeFlag)
+		}
+
+		// User explicitly wants to reconnect
 		if config.Verbose {
-			fmt.Fprintf(os.Stderr, "Container already running, connecting to existing container %s\n", containerName)
+			fmt.Fprintf(os.Stderr, "Reconnecting to existing container %s\n", containerName)
 		}
 
 		// Get container ID
