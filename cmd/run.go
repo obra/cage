@@ -22,12 +22,12 @@ var (
 	runRuntime    string
 	runConfig     string
 	// Credential flags
-	runGitCreds   *bool
-	runSSHCreds   *bool
-	runGHCreds    *bool
-	runGPGCreds   *bool
-	runNPMCreds   *bool
-	runAllCreds   bool
+	runGitCreds *bool
+	runSSHCreds *bool
+	runGHCreds  *bool
+	runGPGCreds *bool
+	runNPMCreds *bool
+	runAllCreds bool
 )
 
 var runCmd = &cobra.Command{
@@ -53,8 +53,9 @@ var runCmd = &cobra.Command{
 				// Config doesn't exist - use defaults
 				cfg = &config.Config{
 					ContainerRuntime: runRuntime,
+					DefaultImage:     "ghcr.io/obra/packnplay-default:latest",
 					DefaultCredentials: config.Credentials{
-						Git: true, // Always copy .gitconfig
+						Git: true,  // Always copy .gitconfig
 						SSH: false, // SSH keys are credentials - user choice
 						GH:  false, // GitHub auth - user choice
 					},
@@ -118,6 +119,7 @@ var runCmd = &cobra.Command{
 			Env:            append(runEnv, configEnv...), // Merge user env vars with config env vars
 			Verbose:        runVerbose,
 			Runtime:        runtime,
+			DefaultImage:   cfg.DefaultImage,
 			Command:        args,
 			Credentials:    creds,
 			DefaultEnvVars: cfg.DefaultEnvVars,

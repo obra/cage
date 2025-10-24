@@ -49,3 +49,24 @@ func TestLoadConfig_NotFound(t *testing.T) {
 		t.Errorf("LoadConfig() = %v, want nil for missing config", config)
 	}
 }
+
+func TestGetDefaultConfig(t *testing.T) {
+	// Test with empty string - should use default
+	config := GetDefaultConfig("")
+	if config.Image != "ghcr.io/obra/packnplay-default:latest" {
+		t.Errorf("GetDefaultConfig(\"\") Image = %v, want ghcr.io/obra/packnplay-default:latest", config.Image)
+	}
+	if config.RemoteUser != "vscode" {
+		t.Errorf("GetDefaultConfig(\"\") RemoteUser = %v, want vscode", config.RemoteUser)
+	}
+
+	// Test with custom image
+	customImage := "mycustom/image:v1"
+	config = GetDefaultConfig(customImage)
+	if config.Image != customImage {
+		t.Errorf("GetDefaultConfig(%v) Image = %v, want %v", customImage, config.Image, customImage)
+	}
+	if config.RemoteUser != "vscode" {
+		t.Errorf("GetDefaultConfig(%v) RemoteUser = %v, want vscode", customImage, config.RemoteUser)
+	}
+}

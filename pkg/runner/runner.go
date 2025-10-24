@@ -23,6 +23,7 @@ type RunConfig struct {
 	Env            []string
 	Verbose        bool
 	Runtime        string // docker, podman, or container
+	DefaultImage   string // default container image to use
 	Command        []string
 	Credentials    config.Credentials
 	DefaultEnvVars []string // API keys to proxy from host
@@ -121,7 +122,7 @@ func Run(config *RunConfig) error {
 		return fmt.Errorf("failed to load devcontainer config: %w", err)
 	}
 	if devConfig == nil {
-		devConfig = devcontainer.GetDefaultConfig()
+		devConfig = devcontainer.GetDefaultConfig(config.DefaultImage)
 	}
 
 	// Step 4: Initialize container client
