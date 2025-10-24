@@ -1,5 +1,7 @@
 # packnplay
 
+![packnplay hero image](docs/hero.jpeg)
+
 > **⚠️ WARNING: This code is untested and experimental. Use at your own risk. It has not been validated in production environments.**
 
 packnplay launches commands (like Claude Code, Codex, Gemini) inside isolated Docker containers with automated worktree and dev container management.
@@ -241,6 +243,10 @@ packnplay stop --worktree=feature
 # Stop all packnplay containers
 packnplay stop --all
 ```
+
+## Credits
+
+- Hero image contributed by [Dan Shapiro](https://github.com/danshapiro)
 
 ## License
 
