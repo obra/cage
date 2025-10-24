@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 	"time"
 
@@ -19,6 +20,7 @@ var (
 	runEnv        []string
 	runVerbose    bool
 	runRuntime    string
+	runConfig     string
 	// Credential flags
 	runGitCreds   *bool
 	runSSHCreds   *bool
@@ -99,11 +101,21 @@ var runCmd = &cobra.Command{
 			runtime = cfg.ContainerRuntime
 		}
 
+		// Apply environment configuration if specified
+		var configEnv []string
+		if runConfig != "" {
+			if envConfig, exists := cfg.EnvConfigs[runConfig]; exists {
+				configEnv = applyEnvConfig(envConfig)
+			} else {
+				return fmt.Errorf("environment config '%s' not found in config file", runConfig)
+			}
+		}
+
 		runConfig := &runner.RunConfig{
 			Path:        runPath,
 			Worktree:    runWorktree,
 			NoWorktree:  runNoWorktree,
-			Env:         runEnv,
+			Env:         append(runEnv, configEnv...), // Merge user env vars with config env vars
 			Verbose:     runVerbose,
 			Runtime:     runtime,
 			Command:     args,
@@ -131,6 +143,7 @@ func init() {
 	runCmd.Flags().BoolVar(&runNoWorktree, "no-worktree", false, "Skip worktree, use directory directly")
 	runCmd.Flags().StringSliceVar(&runEnv, "env", []string{}, "Additional env vars (KEY=value)")
 	runCmd.Flags().StringVar(&runRuntime, "runtime", "", "Container runtime to use (docker/podman/container)")
+	runCmd.Flags().StringVar(&runConfig, "config", "", "API config profile (anthropic, z.ai, anthropic-work, claude-personal)")
 	runCmd.Flags().BoolVar(&runVerbose, "verbose", false, "Show all docker/git commands")
 
 	// Credential flags (use pointers so we can detect if they were explicitly set)
@@ -174,4 +187,48 @@ func isWatcherRunning() bool {
 	cmd := exec.Command("pgrep", "-f", "packnplay.*watch-credentials")
 	err := cmd.Run()
 	return err == nil
+}
+
+// applyEnvConfig processes environment configuration and returns env var array
+func applyEnvConfig(envConfig config.EnvConfig) []string {
+	var envVars []string
+
+	for key, value := range envConfig.EnvVars {
+		// Substitute ${VAR_NAME} with actual environment variable values
+		resolvedValue := expandEnvVars(value)
+		envVars = append(envVars, fmt.Sprintf("%s=%s", key, resolvedValue))
+	}
+
+	return envVars
+}
+
+// expandEnvVars substitutes ${VAR_NAME} with environment variable values
+func expandEnvVars(value string) string {
+	// Simple variable substitution for ${VAR_NAME} pattern
+	result := value
+
+	// Find all ${VAR_NAME} patterns
+	for {
+		start := strings.Index(result, "${")
+		if start == -1 {
+			break
+		}
+
+		end := strings.Index(result[start:], "}")
+		if end == -1 {
+			break
+		}
+		end += start
+
+		// Extract variable name
+		varName := result[start+2 : end]
+
+		// Get environment variable value
+		envValue := os.Getenv(varName)
+
+		// Replace ${VAR_NAME} with value
+		result = result[:start] + envValue + result[end+1:]
+	}
+
+	return result
 }
