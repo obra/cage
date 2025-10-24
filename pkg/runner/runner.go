@@ -220,10 +220,22 @@ func Run(config *RunConfig) error {
 	var needsCredentialOverlay bool
 	var credentialFile string
 
-	if !fileExists(hostCredFile) {
+	// Check if host has meaningful credentials (not just empty file)
+	hostHasCredentials := false
+	if fileExists(hostCredFile) {
+		if stat, err := os.Stat(hostCredFile); err == nil && stat.Size() >= 20 {
+			hostHasCredentials = true
+		}
+	}
+
+	if !hostHasCredentials {
 		needsCredentialOverlay = true
 		if config.Verbose {
-			fmt.Fprintf(os.Stderr, "Host has no .credentials.json, using container-managed credentials\n")
+			if !fileExists(hostCredFile) {
+				fmt.Fprintf(os.Stderr, "Host has no .credentials.json, using container-managed credentials\n")
+			} else {
+				fmt.Fprintf(os.Stderr, "Host .credentials.json is too small (%d bytes), using container-managed credentials\n", getFileSize(hostCredFile))
+			}
 		}
 
 		var err error
@@ -233,7 +245,7 @@ func Run(config *RunConfig) error {
 		}
 	} else {
 		if config.Verbose {
-			fmt.Fprintf(os.Stderr, "Using host .credentials.json (no overlay needed)\n")
+			fmt.Fprintf(os.Stderr, "Using host .credentials.json (%d bytes)\n", getFileSize(hostCredFile))
 		}
 	}
 
@@ -520,6 +532,13 @@ func getContainerID(dockerClient *docker.Client, name string) (string, error) {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+func getFileSize(path string) int64 {
+	if stat, err := os.Stat(path); err == nil {
+		return stat.Size()
+	}
+	return 0
 }
 
 // getOrCreateContainerCredentialFile manages shared credential file for all containers
