@@ -181,7 +181,7 @@ func Run(config *RunConfig) error {
 			fmt.Fprintf(os.Stderr, "Checking for stopped container with same name...\n")
 		}
 		// Try to delete - will fail silently if doesn't exist
-		dockerClient.Run("rm", containerName)
+		_, _ = dockerClient.Run("rm", containerName)
 	}
 
 	// Step 8: Get current user and detect OS
@@ -376,7 +376,7 @@ func Run(config *RunConfig) error {
 	claudeConfigSrc := filepath.Join(homeDir, ".claude.json")
 	if _, err := os.Stat(claudeConfigSrc); err == nil {
 		if err := copyFileToContainer(dockerClient, containerID, claudeConfigSrc, fmt.Sprintf("/home/%s/.claude.json", devConfig.RemoteUser), devConfig.RemoteUser, config.Verbose); err != nil {
-			dockerClient.Run("rm", "-f", containerID)
+			_, _ = dockerClient.Run("rm", "-f", containerID)
 			return fmt.Errorf("failed to copy .claude.json: %w", err)
 		}
 	}

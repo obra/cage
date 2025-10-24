@@ -31,7 +31,7 @@ func DetermineWorktreePath(projectPath, worktreeName string) string {
 	worktreePath := filepath.Join(xdgDataHome, "packnplay", "worktrees", projectName, sanitizedName)
 
 	// Ensure parent directory exists
-	os.MkdirAll(filepath.Dir(worktreePath), 0755)
+	_ = os.MkdirAll(filepath.Dir(worktreePath), 0755)
 
 	return worktreePath
 }

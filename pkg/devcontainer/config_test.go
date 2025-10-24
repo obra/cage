@@ -10,14 +10,14 @@ func TestLoadConfig(t *testing.T) {
 	// Create temp dir with devcontainer.json
 	tmpDir := t.TempDir()
 	devcontainerDir := filepath.Join(tmpDir, ".devcontainer")
-	os.Mkdir(devcontainerDir, 0755)
+	_ = os.Mkdir(devcontainerDir, 0755)
 
 	configContent := `{
 		"image": "mcr.microsoft.com/devcontainers/base:ubuntu",
 		"remoteUser": "vscode"
 	}`
 
-	os.WriteFile(
+	_ = os.WriteFile(
 		filepath.Join(devcontainerDir, "devcontainer.json"),
 		[]byte(configContent),
 		0644,

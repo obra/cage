@@ -44,7 +44,8 @@
       "Bash(make test:*)",
       "Bash(make build:*)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(git pull:*)"
     ],
     "deny": [],
     "ask": []

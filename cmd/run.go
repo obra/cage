@@ -44,9 +44,9 @@ var runCmd = &cobra.Command{
 				cfg = &config.Config{
 					ContainerRuntime: runRuntime,
 					DefaultCredentials: config.Credentials{
-						Git: true, // Sensible defaults
-						SSH: true,
-						GH:  true,
+						Git: true, // Always copy .gitconfig
+						SSH: false, // SSH keys are credentials - user choice
+						GH:  false, // GitHub auth - user choice
 					},
 				}
 			}
