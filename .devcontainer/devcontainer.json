@@ -1,5 +1,5 @@
 {
-  "name": "Pack 'n Play Default Container with AI CLIs",
+  "name": "packnplay Default Container with AI CLIs",
   "dockerFile": "Dockerfile",
   "remoteUser": "vscode",
   "features": {

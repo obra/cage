@@ -1,4 +1,4 @@
-# Pack 'n Play Default Dev Container
+# packnplay Default Dev Container
 
 This is the default dev container used by packnplay when a project doesn't have its own `.devcontainer/devcontainer.json`.
 

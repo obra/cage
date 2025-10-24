@@ -1,8 +1,8 @@
-# Pack 'n Play
+# packnplay
 
 > **⚠️ WARNING: This code is untested and experimental. Use at your own risk. It has not been validated in production environments.**
 
-Pack 'n Play launches commands (like Claude Code, Codex, Gemini) inside isolated Docker containers with automated worktree and dev container management.
+packnplay launches commands (like Claude Code, Codex, Gemini) inside isolated Docker containers with automated worktree and dev container management.
 
 ## Features
 

@@ -37,7 +37,8 @@
       "WebSearch",
       "Bash(docker info:*)",
       "Bash(docker exec packnplay-claude-launcher-test-branch bash -c \"cd /workspace && git status && pwd\")",
-      "Bash(docker exec:*)"
+      "Bash(docker exec:*)",
+      "Bash(./packnplay:*)"
     ],
     "deny": [],
     "ask": []
