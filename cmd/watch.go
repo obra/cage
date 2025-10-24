@@ -69,7 +69,7 @@ func runCredentialWatcher() error {
 			}
 
 			if event.Op&fsnotify.Write == fsnotify.Write {
-				if strings.HasSuffix(event.Name, ".credentials.json") {
+				if strings.Contains(event.Name, "packnplay-claude-credentials") {
 					if err := w.handleCredentialUpdate(event.Name); err != nil {
 						log.Printf("Error handling credential update: %v", err)
 					}
@@ -178,10 +178,6 @@ func isDarwin() bool {
 }
 
 func getCredentialsDir() string {
-	home, _ := os.UserHomeDir()
-	xdgDataHome := os.Getenv("XDG_DATA_HOME")
-	if xdgDataHome == "" {
-		xdgDataHome = filepath.Join(home, ".local", "share")
-	}
-	return filepath.Join(xdgDataHome, "packnplay", "credentials")
+	// Watch system temp directory where we create credential files
+	return os.TempDir()
 }
