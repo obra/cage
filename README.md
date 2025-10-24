@@ -198,11 +198,64 @@ On first run, packnplay prompts you to choose which credentials to enable by def
     "gh": true,
     "gpg": false,
     "npm": false
+  },
+  "env_configs": {
+    "z.ai": {
+      "name": "Z.AI Claude",
+      "description": "Z.AI's Claude implementation with GLM models",
+      "env_vars": {
+        "ANTHROPIC_AUTH_TOKEN": "${Z_AI_API_KEY}",
+        "ANTHROPIC_BASE_URL": "https://api.z.ai/api/anthropic",
+        "API_TIMEOUT_MS": "3000000",
+        "ANTHROPIC_DEFAULT_OPUS_MODEL": "GLM-4.6",
+        "ANTHROPIC_DEFAULT_SONNET_MODEL": "GLM-4.6",
+        "ANTHROPIC_DEFAULT_HAIKU_MODEL": "GLM-4.5-Air"
+      }
+    },
+    "anthropic-work": {
+      "name": "Anthropic API (Work)",
+      "description": "Work API key with standard models",
+      "env_vars": {
+        "ANTHROPIC_API_KEY": "${ANTHROPIC_WORK_API_KEY}"
+      }
+    },
+    "claude-personal": {
+      "name": "Claude Personal",
+      "description": "Personal API key setup",
+      "env_vars": {
+        "ANTHROPIC_API_KEY": "${ANTHROPIC_PERSONAL_API_KEY}",
+        "ANTHROPIC_DEFAULT_SONNET_MODEL": "claude-3-5-sonnet-20241022"
+      }
+    }
   }
 }
 ```
 
 Created interactively on first run. Edit manually or delete to reconfigure.
+
+### Environment Configurations
+
+Environment configs let you define different API setups and switch between them:
+
+```bash
+# Use Z.AI endpoints and models
+packnplay run --config=z.ai claude
+
+# Use work API key
+packnplay run --config=anthropic-work claude
+
+# Use personal API key with specific model
+packnplay run --config=claude-personal claude
+```
+
+**Variable substitution:** Use `${VAR_NAME}` in env_vars to substitute from host environment.
+
+**Required host environment variables:**
+```bash
+export Z_AI_API_KEY="your-z-ai-key"
+export ANTHROPIC_WORK_API_KEY="sk-ant-work-key"
+export ANTHROPIC_PERSONAL_API_KEY="sk-ant-personal-key"
+```
 
 ### Environment Variables
 
