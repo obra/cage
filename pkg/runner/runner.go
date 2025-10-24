@@ -17,14 +17,15 @@ import (
 )
 
 type RunConfig struct {
-	Path        string
-	Worktree    string
-	NoWorktree  bool
-	Env         []string
-	Verbose     bool
-	Runtime     string // docker, podman, or container
-	Command     []string
-	Credentials config.Credentials
+	Path           string
+	Worktree       string
+	NoWorktree     bool
+	Env            []string
+	Verbose        bool
+	Runtime        string // docker, podman, or container
+	Command        []string
+	Credentials    config.Credentials
+	DefaultEnvVars []string // API keys to proxy from host
 }
 
 func Run(config *RunConfig) error {
@@ -260,6 +261,18 @@ func Run(config *RunConfig) error {
 	// Mount workspace at /workspace
 	args = append(args, "-v", fmt.Sprintf("%s:/workspace", mountPath))
 
+	// Mount AI agent config directories (.codex, .gemini) if they exist
+	agentConfigDirs := []string{".codex", ".gemini"}
+	for _, configDir := range agentConfigDirs {
+		agentPath := filepath.Join(homeDir, configDir)
+		if fileExists(agentPath) {
+			args = append(args, "-v", fmt.Sprintf("%s:/home/%s/%s", agentPath, devConfig.RemoteUser, configDir))
+			if config.Verbose {
+				fmt.Fprintf(os.Stderr, "Mounting %s config directory\n", configDir)
+			}
+		}
+	}
+
 	// If using a worktree, also mount the main repo's .git directory at its real path
 	// This allows the worktree's .git file (which contains gitdir: <path>) to resolve correctly
 	if mainRepoGitDir != "" {
@@ -329,7 +342,14 @@ func Run(config *RunConfig) error {
 
 	// Don't set PATH - use container's default PATH to avoid host pollution
 
-	// Add user-specified env vars from --env flags
+	// Add default environment variables (API keys for AI agents)
+	for _, envVar := range config.DefaultEnvVars {
+		if value := os.Getenv(envVar); value != "" {
+			args = append(args, "-e", fmt.Sprintf("%s=%s", envVar, value))
+		}
+	}
+
+	// Add user-specified env vars from --env flags (these can override defaults)
 	for _, env := range config.Env {
 		// Support both --env KEY=value and --env KEY (pass through from host)
 		if strings.Contains(env, "=") {

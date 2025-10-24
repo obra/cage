@@ -112,14 +112,15 @@ var runCmd = &cobra.Command{
 		}
 
 		runConfig := &runner.RunConfig{
-			Path:        runPath,
-			Worktree:    runWorktree,
-			NoWorktree:  runNoWorktree,
-			Env:         append(runEnv, configEnv...), // Merge user env vars with config env vars
-			Verbose:     runVerbose,
-			Runtime:     runtime,
-			Command:     args,
-			Credentials: creds,
+			Path:           runPath,
+			Worktree:       runWorktree,
+			NoWorktree:     runNoWorktree,
+			Env:            append(runEnv, configEnv...), // Merge user env vars with config env vars
+			Verbose:        runVerbose,
+			Runtime:        runtime,
+			Command:        args,
+			Credentials:    creds,
+			DefaultEnvVars: cfg.DefaultEnvVars,
 		}
 
 		if err := runner.Run(runConfig); err != nil {

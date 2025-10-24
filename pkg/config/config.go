@@ -14,6 +14,7 @@ import (
 type Config struct {
 	ContainerRuntime   string                 `json:"container_runtime"`   // docker, podman, or container
 	DefaultCredentials Credentials            `json:"default_credentials"`
+	DefaultEnvVars     []string               `json:"default_env_vars"`    // API keys to always proxy
 	EnvConfigs         map[string]EnvConfig   `json:"env_configs"`
 }
 
@@ -202,6 +203,12 @@ func interactiveSetup(configPath string) (*Config, error) {
 			GH:  ghCreds,
 			GPG: gpgCreds,
 			NPM: npmCreds,
+		},
+		DefaultEnvVars: []string{
+			"ANTHROPIC_API_KEY",
+			"OPENAI_API_KEY",
+			"GEMINI_API_KEY",
+			"GOOGLE_API_KEY",
 		},
 		EnvConfigs: make(map[string]EnvConfig),
 	}

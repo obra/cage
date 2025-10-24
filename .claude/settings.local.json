@@ -47,7 +47,9 @@
       "WebFetch(domain:raw.githubusercontent.com)",
       "Bash(git pull:*)",
       "Read(//tmp/**)",
-      "Bash(git clone:*)"
+      "Bash(git clone:*)",
+      "WebFetch(domain:support.claude.com)",
+      "WebFetch(domain:docs.z.ai)"
     ],
     "deny": [],
     "ask": []
