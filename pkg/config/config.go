@@ -12,8 +12,16 @@ import (
 
 // Config represents packnplay's configuration
 type Config struct {
-	ContainerRuntime   string      `json:"container_runtime"`   // docker, podman, or container
-	DefaultCredentials Credentials `json:"default_credentials"`
+	ContainerRuntime   string                 `json:"container_runtime"`   // docker, podman, or container
+	DefaultCredentials Credentials            `json:"default_credentials"`
+	EnvConfigs         map[string]EnvConfig   `json:"env_configs"`
+}
+
+// EnvConfig defines environment variables for different setups (API configs, etc.)
+type EnvConfig struct {
+	Name        string            `json:"name"`
+	Description string            `json:"description"`
+	EnvVars     map[string]string `json:"env_vars"`
 }
 
 // Credentials specifies which credentials to mount
@@ -195,6 +203,7 @@ func interactiveSetup(configPath string) (*Config, error) {
 			GPG: gpgCreds,
 			NPM: npmCreds,
 		},
+		EnvConfigs: make(map[string]EnvConfig),
 	}
 
 	if saveConfig {
@@ -224,3 +233,4 @@ func detectAvailableRuntimes() []string {
 
 	return available
 }
+
