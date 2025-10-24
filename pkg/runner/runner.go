@@ -275,17 +275,12 @@ func Run(config *RunConfig) error {
 		}
 	}
 
-	if config.Credentials.GH {
-		if !isLinux && ghHostsYmlTempFile != "" {
-			// macOS - mount temp hosts.yml with token from Keychain
-			// Note: Not read-only because gh may want to update it
-			args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.config/gh/hosts.yml", ghHostsYmlTempFile, devConfig.RemoteUser))
-		} else {
-			// Linux - mount entire gh config directory (has hosts.yml with token)
-			ghConfigPath := filepath.Join(homeDir, ".config", "gh")
-			if fileExists(ghConfigPath) {
-				args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.config/gh", ghConfigPath, devConfig.RemoteUser))
-			}
+	// Note: On macOS, gh credentials from Keychain are copied in after container starts
+	// On Linux, mount the gh config directory if it exists
+	if config.Credentials.GH && isLinux {
+		ghConfigPath := filepath.Join(homeDir, ".config", "gh")
+		if fileExists(ghConfigPath) {
+			args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.config/gh", ghConfigPath, devConfig.RemoteUser))
 		}
 	}
 
@@ -362,27 +357,22 @@ func Run(config *RunConfig) error {
 	}
 	containerID = strings.TrimSpace(containerID)
 
-	// Step 10: Copy ~/.claude.json into container
-	claudeConfigSrc := filepath.Join(homeDir, ".claude.json")
-	claudeConfigDst := fmt.Sprintf("%s:/home/%s/.claude.json", containerID, devConfig.RemoteUser)
+	// Step 10: Copy config files into container
 
+	// Copy ~/.claude.json
+	claudeConfigSrc := filepath.Join(homeDir, ".claude.json")
 	if _, err := os.Stat(claudeConfigSrc); err == nil {
-		if config.Verbose {
-			fmt.Fprintf(os.Stderr, "Copying %s to container\n", claudeConfigSrc)
-		}
-		_, err = dockerClient.Run("cp", claudeConfigSrc, claudeConfigDst)
-		if err != nil {
-			// Clean up container on error
+		if err := copyFileToContainer(dockerClient, containerID, claudeConfigSrc, fmt.Sprintf("/home/%s/.claude.json", devConfig.RemoteUser), devConfig.RemoteUser, config.Verbose); err != nil {
 			dockerClient.Run("rm", "-f", containerID)
 			return fmt.Errorf("failed to copy .claude.json: %w", err)
 		}
+	}
 
-		// Fix ownership to match container user (docker cp creates files as root)
-		// Must run as root to chown
-		_, err = dockerClient.Run("exec", "-u", "root", containerID, "chown", fmt.Sprintf("%s:%s", devConfig.RemoteUser, devConfig.RemoteUser), fmt.Sprintf("/home/%s/.claude.json", devConfig.RemoteUser))
-		if err != nil {
+	// Copy gh config directory if credentials enabled and temp file created (macOS Keychain)
+	if config.Credentials.GH && !isLinux && ghHostsYmlTempFile != "" {
+		if err := copyFileToContainer(dockerClient, containerID, ghHostsYmlTempFile, fmt.Sprintf("/home/%s/.config/gh/hosts.yml", devConfig.RemoteUser), devConfig.RemoteUser, config.Verbose); err != nil {
 			if config.Verbose {
-				fmt.Fprintf(os.Stderr, "Warning: failed to fix .claude.json ownership: %v\n", err)
+				fmt.Fprintf(os.Stderr, "Warning: failed to copy gh hosts.yml: %v\n", err)
 			}
 		}
 	}
@@ -463,6 +453,35 @@ func containerIsRunning(dockerClient *docker.Client, name string) (bool, error) 
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+// copyFileToContainer copies a file into container and fixes ownership
+func copyFileToContainer(dockerClient *docker.Client, containerID, srcPath, dstPath, user string, verbose bool) error {
+	if verbose {
+		fmt.Fprintf(os.Stderr, "Copying %s to container at %s\n", srcPath, dstPath)
+	}
+
+	// Ensure parent directory exists in container
+	dstDir := filepath.Dir(dstPath)
+	_, err := dockerClient.Run("exec", containerID, "mkdir", "-p", dstDir)
+	if err != nil {
+		return fmt.Errorf("failed to create parent directory: %w", err)
+	}
+
+	// Copy file
+	containerDst := fmt.Sprintf("%s:%s", containerID, dstPath)
+	_, err = dockerClient.Run("cp", srcPath, containerDst)
+	if err != nil {
+		return fmt.Errorf("failed to copy file: %w", err)
+	}
+
+	// Fix ownership (docker cp creates as root)
+	_, err = dockerClient.Run("exec", "-u", "root", containerID, "chown", "-R", fmt.Sprintf("%s:%s", user, user), dstDir)
+	if err != nil && verbose {
+		fmt.Fprintf(os.Stderr, "Warning: failed to fix ownership: %v\n", err)
+	}
+
+	return nil
 }
 
 // getClaudeCredentialsFromKeychain extracts Claude credentials from macOS Keychain
