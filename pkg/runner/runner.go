@@ -390,7 +390,7 @@ func Run(config *RunConfig) error {
 
 	containerID, err := dockerClient.Run(args...)
 	if err != nil {
-		return fmt.Errorf("failed to start container: %w", err)
+		return fmt.Errorf("failed to start container: %w\nDocker output:\n%s", err, containerID)
 	}
 	containerID = strings.TrimSpace(containerID)
 
@@ -456,9 +456,9 @@ func ensureImage(dockerClient *docker.Client, config *devcontainer.Config, proje
 			dockerfilePath := filepath.Join(projectPath, ".devcontainer", config.DockerFile)
 			contextPath := filepath.Join(projectPath, ".devcontainer")
 
-			_, err := dockerClient.Run("build", "-f", dockerfilePath, "-t", imageName, contextPath)
+			output, err := dockerClient.Run("build", "-f", dockerfilePath, "-t", imageName, contextPath)
 			if err != nil {
-				return fmt.Errorf("failed to build image: %w", err)
+				return fmt.Errorf("failed to build image from %s: %w\nDocker output:\n%s", config.DockerFile, err, output)
 			}
 		}
 	} else {
@@ -473,9 +473,9 @@ func ensureImage(dockerClient *docker.Client, config *devcontainer.Config, proje
 				fmt.Fprintf(os.Stderr, "Pulling image %s\n", imageName)
 			}
 
-			_, err := dockerClient.Run("pull", imageName)
+			output, err := dockerClient.Run("pull", imageName)
 			if err != nil {
-				return fmt.Errorf("failed to pull image: %w", err)
+				return fmt.Errorf("failed to pull image %s: %w\nDocker output:\n%s", imageName, err, output)
 			}
 		}
 	}
@@ -654,16 +654,16 @@ func copyFileToContainer(dockerClient *docker.Client, containerID, srcPath, dstP
 	// Docker/Podman: use cp command
 	// Ensure parent directory exists in container
 	dstDir := filepath.Dir(dstPath)
-	_, err := dockerClient.Run("exec", containerID, "mkdir", "-p", dstDir)
+	output, err := dockerClient.Run("exec", containerID, "mkdir", "-p", dstDir)
 	if err != nil {
-		return fmt.Errorf("failed to create parent directory: %w", err)
+		return fmt.Errorf("failed to create parent directory %s: %w\nDocker output:\n%s", dstDir, err, output)
 	}
 
 	// Copy file
 	containerDst := fmt.Sprintf("%s:%s", containerID, dstPath)
-	_, err = dockerClient.Run("cp", srcPath, containerDst)
+	output, err = dockerClient.Run("cp", srcPath, containerDst)
 	if err != nil {
-		return fmt.Errorf("failed to copy file: %w", err)
+		return fmt.Errorf("failed to copy file %s to %s: %w\nDocker output:\n%s", srcPath, dstPath, err, output)
 	}
 
 	// Fix ownership (docker cp creates as root)
