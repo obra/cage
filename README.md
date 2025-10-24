@@ -2,15 +2,16 @@
 
 > **⚠️ WARNING: This code is untested and experimental. Use at your own risk. It has not been validated in production environments.**
 
-Cage launches commands (like Claude Code) inside isolated Docker containers with automated worktree and dev container management.
+Cage launches commands (like Claude Code, Codex, Gemini) inside isolated Docker containers with automated worktree and dev container management.
 
 ## Features
 
-- **Sandboxed Execution**: Run commands in isolated Docker containers
-- **Automatic Worktree Management**: Creates and manages git worktrees automatically
-- **Dev Container Support**: Uses project's `.devcontainer/devcontainer.json` or sensible defaults
-- **UID Mapping**: Proper file ownership with idmap mounts (Linux 6.0.8+, Docker 28.5.1+)
-- **Environment Proxying**: Forwards host environment with `IS_SANDBOX=1` indicator
+- **Sandboxed Execution**: Run AI coding assistants in isolated Docker containers
+- **Automatic Worktree Management**: Creates git worktrees in XDG-compliant locations (`~/.local/share/cage/worktrees`)
+- **Dev Container Support**: Uses project's `.devcontainer/devcontainer.json` or feature-rich default with AI CLIs pre-installed
+- **Credential Management**: Interactive first-run setup for git, GitHub CLI, GPG, and npm credentials
+- **Clean Environment**: Only passes safe environment variables (terminal/locale), no host pollution
+- **macOS Keychain Integration**: Automatically extracts Claude and GitHub CLI credentials from macOS Keychain
 
 ## Installation
 
@@ -25,161 +26,213 @@ Or install directly:
 go install github.com/obra/cage@latest
 ```
 
+## Quick Start
+
+On first run, cage will prompt you to configure which credentials to mount (git, GitHub CLI, GPG, npm). Your choices are saved to `~/.config/cage/config.json`.
+
+```bash
+# Run Claude Code in a sandboxed container (creates worktree automatically)
+cage run claude
+
+# Run in a specific worktree
+cage run --worktree=feature-auth claude
+
+# Run with all credentials enabled
+cage run --all-creds claude
+
+# List running containers
+cage list
+
+# Stop all containers
+cage stop --all
+```
+
 ## Usage
 
-### Run a command in a container
+### Basic Commands
 
 ```bash
-cage run 'claude --dangerously-skip-permissions'
-```
+# Run command in container (auto-creates worktree from current branch)
+cage run <command>
 
-### Specify a worktree
+# Use specific worktree (creates if doesn't exist, uses if exists)
+cage run --worktree=<name> <command>
 
-```bash
-cage run --worktree=feature-auth claude
-```
+# Skip worktree, use current directory
+cage run --no-worktree <command>
 
-### Use current directory without worktree
+# Pass arguments to the command
+cage run bash -c "echo hello && ls"
 
-```bash
-cage run --no-worktree bash
-```
+# Attach to running container
+cage attach --worktree=<name>
 
-### Add environment variables
+# Stop specific container
+cage stop --worktree=<name>
 
-```bash
-cage run --env DEBUG=1 --env LOG_LEVEL=trace claude
-```
+# Stop all cage containers
+cage stop --all
 
-### Attach to running container
-
-```bash
-cage attach --worktree=feature-auth
-```
-
-### Stop a container
-
-```bash
-cage stop --worktree=feature-auth
-```
-
-### List all containers
-
-```bash
+# List all running containers
 cage list
+```
+
+### Credential Flags
+
+Override default credential settings per-invocation:
+
+```bash
+# Enable specific credentials
+cage run --git-creds claude           # Mount git config and SSH keys
+cage run --gh-creds claude            # Mount GitHub CLI credentials
+cage run --gpg-creds claude           # Mount GPG keys for signing
+cage run --npm-creds claude           # Mount npm credentials
+cage run --all-creds claude           # Mount all available credentials
+```
+
+### Environment Variables
+
+```bash
+# Set specific environment variable
+cage run --env DEBUG=1 claude
+
+# Pass through variable from host
+cage run --env EDITOR bash
+
+# Multiple variables
+cage run --env DEBUG=1 --env EDITOR bash
 ```
 
 ## How It Works
 
 ### Worktree Management
 
-- **Auto-create**: If you're in a git repo, cage creates a worktree based on current branch
-- **Explicit**: Use `--worktree=<name>` to specify or create a worktree
-- **Skip**: Use `--no-worktree` to use directory directly
-- **Collision detection**: Errors if worktree already exists (prevents accidents)
+Cage creates git worktrees in XDG-compliant locations for isolation:
+
+- **Location**: `~/.local/share/cage/worktrees/<project>/<worktree>` (or `$XDG_DATA_HOME/cage/worktrees`)
+- **Auto-create**: If you're in a git repo without `--worktree` flag, uses current branch name
+- **Explicit**: `--worktree=<name>` creates new or connects to existing worktree
+- **Skip**: `--no-worktree` uses current directory without git worktree
+- **Auto-connect**: If container already running for a worktree, automatically connects to it
+- **Git integration**: Main repo's `.git` directory mounted so git commands work correctly
 
 ### Dev Container Discovery
 
 1. Checks for `.devcontainer/devcontainer.json` in project
 2. Falls back to `ghcr.io/obra/cage-default:latest` if not found
-   - Includes Node.js, Claude Code, OpenAI Codex, and Google Gemini CLIs
 3. Supports both `image` (pulls) and `dockerFile` (builds) fields
 4. Auto-pulls/builds images as needed
 
-### Building and Publishing the Default Container
+**Default container includes:**
+- Node.js v22 LTS
+- AI CLI tools: Claude Code (`claude`), OpenAI Codex (`codex`), Google Gemini (`gemini`)
+- GitHub CLI (`gh`)
+- Git and common development utilities
 
-The default container includes Node.js and AI CLI tools (Claude Code, OpenAI Codex, Google Gemini).
+## Rebuilding the Default Container
 
-**Build the container:**
+See [.devcontainer/README.md](.devcontainer/README.md) for instructions on building and publishing the default container image.
 
-```bash
-cd .devcontainer
-docker build -t ghcr.io/obra/cage-default:latest .
-```
+### Credential Handling
 
-**Test the container:**
+**Interactive Setup (first run):**
+On first run, cage prompts you to choose which credentials to enable by default using a beautiful terminal UI.
 
-```bash
-# Start an interactive shell in the container
-docker run -it --rm ghcr.io/obra/cage-default:latest bash
+**Credentials are mounted read-only for security:**
+- **Git**: `~/.gitconfig` and `~/.ssh` (for git operations and SSH keys)
+- **GitHub CLI**: `~/.config/gh` (copied from Keychain on macOS, mounted on Linux)
+- **GPG**: `~/.gnupg` (for commit signing)
+- **npm**: `~/.npmrc` (for authenticated package operations)
 
-# Inside the container, verify all tools are installed:
-which node npm
-which claude codex gemini
-node --version
-npm --version
-```
-
-**Push to GitHub Container Registry:**
-
-```bash
-# Login to GHCR (one time setup)
-echo $GITHUB_TOKEN | docker login ghcr.io -u obra --password-stdin
-
-# Or use gh CLI
-gh auth token | docker login ghcr.io -u obra --password-stdin
-
-# Push the image
-docker push ghcr.io/obra/cage-default:latest
-```
-
-**Update cage to use the new default image:**
-
-Edit `pkg/devcontainer/config.go` and change:
-```go
-Image: "ghcr.io/obra/cage-default:latest",
-```
-
-Then rebuild and reinstall cage:
-```bash
-go build -o cage .
-go install
-```
+**macOS Keychain Integration:**
+- Claude credentials automatically extracted from Keychain (`Claude Code-credentials`)
+- GitHub CLI credentials extracted and base64-decoded from Keychain (`gh:github.com`)
+- Credentials copied into container (not mounted) to avoid file locking
 
 ### File Mounts
 
 - `~/.claude` → mounted read-write (skills, plugins, history)
-- `~/.claude.json` → copied (avoids file lock conflicts)
-- Project/worktree → mounted at `/workspace` with idmap
+- `~/.claude.json` → copied into container (avoids file lock conflicts)
+- Worktree → mounted at `/workspace`
+- Main repo `.git` → mounted at its real path (git commands work)
+
+### Environment Variables
+
+**Safe whitelist approach:**
+- Only `TERM`, `LANG`, `LC_*`, `COLORTERM` passed from host
+- `HOME=/home/vscode` set in container
+- `IS_SANDBOX=1` marker added
+- `PATH` uses container default (not polluted from host)
+- Use `--env KEY=value` or `--env KEY` to pass additional variables
 
 ### Container Lifecycle
 
-- Session-based: container runs until command exits
-- Labeled: all containers tagged with `managed-by=cage`
-- Multiple sessions can attach to running containers
+- **Persistent containers**: Started with `cage run`, stay running after command exits
+- **Auto-attach**: Running `cage run` again connects to existing container
+- **Labeled**: All containers tagged with `managed-by=cage` for tracking
+- **Clean**: Use `cage stop --all` to stop and remove all cage containers
 
 ## Requirements
 
-- Linux 6.0.8+ (for idmap support)
-- Docker 28.5.1+ (for idmap support)
-- Git (for worktree features)
-- Go 1.21+ (for building)
+- **Docker**: Docker Desktop on macOS, or Docker Engine on Linux
+- **Git**: For worktree functionality
+- **Go 1.23+**: For building from source
+- **Optional**: GitHub CLI (`gh`) for GitHub operations
 
-## Environment Variables
+## Configuration
+
+### Config File
+
+`~/.config/cage/config.json` (XDG-compliant):
+
+```json
+{
+  "default_credentials": {
+    "git": true,
+    "gh": true,
+    "gpg": false,
+    "npm": false
+  }
+}
+```
+
+Created interactively on first run. Edit manually or delete to reconfigure.
+
+### Environment Variables
 
 - `DOCKER_CMD`: Override docker command (e.g., `DOCKER_CMD=podman cage run ...`)
+- `XDG_DATA_HOME`: Override data directory (default: `~/.local/share`)
+- `XDG_CONFIG_HOME`: Override config directory (default: `~/.config`)
 
 ## Examples
 
 ```bash
-# Run Claude in auto-created worktree
-cd ~/myproject
+# First run - interactive credential setup, then run Claude
 cage run claude
 
-# Run in specific worktree with debug logging
-cage run --worktree=bug-fix --env DEBUG=1 --verbose claude
+# Run in specific worktree with all credentials
+cage run --worktree=bug-fix --all-creds claude
+
+# Run with custom environment variables
+cage run --env DEBUG=1 --env EDITOR bash -c "echo \$EDITOR"
 
 # Get a shell in the container
 cage run --worktree=feature bash
 
-# Attach to running container
+# Run command in existing container (auto-connects)
+cage run --worktree=feature npm test
+
+# Attach with interactive shell
 cage attach --worktree=feature
 
 # List all running containers
 cage list
 
-# Stop container
+# Stop specific container
 cage stop --worktree=feature
+
+# Stop all cage containers
+cage stop --all
 ```
 
 ## License
