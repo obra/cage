@@ -79,8 +79,8 @@ func Save(cfg *Config) error {
 
 // interactiveSetup prompts user for credential configuration
 func interactiveSetup(configPath string) (*Config, error) {
-	fmt.Println("\n🔐 Cage First Run Setup")
-	fmt.Println("Configure which credentials to mount in containers by default.\n")
+	fmt.Println("\n🔐 packnplay First Run Setup")
+	fmt.Println("Configure which credentials to mount in containers by default.")
 
 	var gitCreds, ghCreds, gpgCreds, npmCreds, saveConfig bool
 
@@ -142,9 +142,9 @@ func interactiveSetup(configPath string) (*Config, error) {
 		if err := Save(cfg); err != nil {
 			return nil, err
 		}
-		fmt.Printf("\n✓ Configuration saved to %s\n\n", configPath)
+		fmt.Printf("\n✓ Configuration saved to %s\n", configPath)
 	} else {
-		fmt.Println("\n✓ Using one-time configuration (not saved)\n")
+		fmt.Println("\n✓ Using one-time configuration (not saved)")
 	}
 
 	return cfg, nil

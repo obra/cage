@@ -9,19 +9,19 @@ func TestDetermineWorktreePath(t *testing.T) {
 		name          string
 		projectPath   string
 		worktreeName  string
-		wantContains  string
+		wantContains  []string
 	}{
 		{
 			name:         "basic worktree path",
 			projectPath:  "/home/user/myproject",
 			worktreeName: "feature-auth",
-			wantContains: "myproject-feature-auth",
+			wantContains: []string{"packnplay/worktrees", "myproject", "feature-auth"},
 		},
 		{
 			name:         "sanitize slashes in branch name",
 			projectPath:  "/home/user/myproject",
 			worktreeName: "feature/auth",
-			wantContains: "myproject-feature-auth",
+			wantContains: []string{"packnplay/worktrees", "myproject", "feature-auth"},
 		},
 	}
 
@@ -29,8 +29,10 @@ func TestDetermineWorktreePath(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			got := DetermineWorktreePath(tt.projectPath, tt.worktreeName)
 
-			if !contains(got, tt.wantContains) {
-				t.Errorf("DetermineWorktreePath() = %v, want to contain %v", got, tt.wantContains)
+			for _, want := range tt.wantContains {
+				if !contains(got, want) {
+					t.Errorf("DetermineWorktreePath() = %v, want to contain %v", got, want)
+				}
 			}
 		})
 	}
