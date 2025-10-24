@@ -573,6 +573,15 @@ func copyFileToContainer(dockerClient *docker.Client, containerID, srcPath, dstP
 		fmt.Fprintf(os.Stderr, "Copying %s to container at %s\n", srcPath, dstPath)
 	}
 
+	// Check if this is Apple Container (no cp command)
+	isApple := dockerClient.Command() == "container"
+
+	if isApple {
+		// Apple Container: use exec with base64 to write file
+		return copyFileViaExec(dockerClient, containerID, srcPath, dstPath, user, verbose)
+	}
+
+	// Docker/Podman: use cp command
 	// Ensure parent directory exists in container
 	dstDir := filepath.Dir(dstPath)
 	_, err := dockerClient.Run("exec", containerID, "mkdir", "-p", dstDir)
@@ -589,6 +598,45 @@ func copyFileToContainer(dockerClient *docker.Client, containerID, srcPath, dstP
 
 	// Fix ownership (docker cp creates as root)
 	_, err = dockerClient.Run("exec", "-u", "root", containerID, "chown", "-R", fmt.Sprintf("%s:%s", user, user), dstDir)
+	if err != nil && verbose {
+		fmt.Fprintf(os.Stderr, "Warning: failed to fix ownership: %v\n", err)
+	}
+
+	return nil
+}
+
+// copyFileViaExec copies a file using exec (for Apple Container which has no cp command)
+func copyFileViaExec(dockerClient *docker.Client, containerID, srcPath, dstPath, user string, verbose bool) error {
+	// Read file content
+	content, err := os.ReadFile(srcPath)
+	if err != nil {
+		return fmt.Errorf("failed to read source file: %w", err)
+	}
+
+	// Ensure parent directory exists
+	dstDir := filepath.Dir(dstPath)
+	_, err = dockerClient.Run("exec", containerID, "mkdir", "-p", dstDir)
+	if err != nil {
+		return fmt.Errorf("failed to create parent directory: %w", err)
+	}
+
+	// Write file using base64 to avoid shell escaping issues
+	cmd := exec.Command("base64")
+	cmd.Stdin = strings.NewReader(string(content))
+	encoded, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to encode file: %w", err)
+	}
+
+	// Write the file via exec using base64 decode
+	_, err = dockerClient.Run("exec", containerID, "sh", "-c",
+		fmt.Sprintf("echo '%s' | base64 -d > %s", strings.TrimSpace(string(encoded)), dstPath))
+	if err != nil {
+		return fmt.Errorf("failed to write file: %w", err)
+	}
+
+	// Fix ownership
+	_, err = dockerClient.Run("exec", containerID, "chown", fmt.Sprintf("%s:%s", user, user), dstPath)
 	if err != nil && verbose {
 		fmt.Fprintf(os.Stderr, "Warning: failed to fix ownership: %v\n", err)
 	}
