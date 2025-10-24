@@ -278,12 +278,13 @@ func Run(config *RunConfig) error {
 	if config.Credentials.GH {
 		if !isLinux && ghHostsYmlTempFile != "" {
 			// macOS - mount temp hosts.yml with token from Keychain
-			args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.config/gh/hosts.yml:ro", ghHostsYmlTempFile, devConfig.RemoteUser))
+			// Note: Not read-only because gh may want to update it
+			args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.config/gh/hosts.yml", ghHostsYmlTempFile, devConfig.RemoteUser))
 		} else {
 			// Linux - mount entire gh config directory (has hosts.yml with token)
 			ghConfigPath := filepath.Join(homeDir, ".config", "gh")
 			if fileExists(ghConfigPath) {
-				args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.config/gh:ro", ghConfigPath, devConfig.RemoteUser))
+				args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.config/gh", ghConfigPath, devConfig.RemoteUser))
 			}
 		}
 	}
