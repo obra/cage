@@ -588,7 +588,8 @@ func copyFileToContainer(dockerClient *docker.Client, containerID, srcPath, dstP
 	}
 
 	// Fix ownership (docker cp creates as root)
-	_, err = dockerClient.Run("exec", "-u", "root", containerID, "chown", "-R", fmt.Sprintf("%s:%s", user, user), dstDir)
+	// Only chown the specific file, not the entire directory (might contain read-only mounts)
+	_, err = dockerClient.Run("exec", "-u", "root", containerID, "chown", fmt.Sprintf("%s:%s", user, user), dstPath)
 	if err != nil && verbose {
 		fmt.Fprintf(os.Stderr, "Warning: failed to fix ownership: %v\n", err)
 	}
