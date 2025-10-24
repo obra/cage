@@ -14,8 +14,22 @@ type Client struct {
 
 // NewClient creates a new Docker client
 func NewClient(verbose bool) (*Client, error) {
+	return NewClientWithRuntime("", verbose)
+}
+
+// NewClientWithRuntime creates a client with a specific runtime preference
+func NewClientWithRuntime(preferredRuntime string, verbose bool) (*Client, error) {
 	client := &Client{verbose: verbose}
-	cmd, err := client.DetectCLI()
+
+	var cmd string
+	var err error
+
+	if preferredRuntime != "" {
+		cmd, err = client.UseSpecificRuntime(preferredRuntime)
+	} else {
+		cmd, err = client.DetectCLI()
+	}
+
 	if err != nil {
 		return nil, err
 	}
@@ -23,9 +37,17 @@ func NewClient(verbose bool) (*Client, error) {
 	return client, nil
 }
 
+// UseSpecificRuntime uses a specific container runtime
+func (c *Client) UseSpecificRuntime(runtime string) (string, error) {
+	if _, err := exec.LookPath(runtime); err != nil {
+		return "", fmt.Errorf("container runtime '%s' not found in PATH", runtime)
+	}
+	return runtime, nil
+}
+
 // DetectCLI finds the docker command to use
 func (c *Client) DetectCLI() (string, error) {
-	// Check for DOCKER_CMD environment variable
+	// Check for DOCKER_CMD environment variable (legacy support)
 	if envCmd := os.Getenv("DOCKER_CMD"); envCmd != "" {
 		if _, err := exec.LookPath(envCmd); err != nil {
 			return "", fmt.Errorf("DOCKER_CMD=%s not found in PATH", envCmd)
@@ -33,17 +55,15 @@ func (c *Client) DetectCLI() (string, error) {
 		return envCmd, nil
 	}
 
-	// Try docker first
-	if _, err := exec.LookPath("docker"); err == nil {
-		return "docker", nil
+	// Try in order: docker, podman, container
+	runtimes := []string{"docker", "podman", "container"}
+	for _, runtime := range runtimes {
+		if _, err := exec.LookPath(runtime); err == nil {
+			return runtime, nil
+		}
 	}
 
-	// Try podman as fallback
-	if _, err := exec.LookPath("podman"); err == nil {
-		return "podman", nil
-	}
-
-	return "", fmt.Errorf("no docker-compatible CLI found (tried: docker, podman)")
+	return "", fmt.Errorf("no container runtime found (tried: docker, podman, container)")
 }
 
 // Run executes a docker command

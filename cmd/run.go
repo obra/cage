@@ -15,6 +15,7 @@ var (
 	runNoWorktree bool
 	runEnv        []string
 	runVerbose    bool
+	runRuntime    string
 	// Credential flags
 	runGitCreds   *bool
 	runGHCreds    *bool
@@ -58,12 +59,19 @@ var runCmd = &cobra.Command{
 			creds.NPM = true
 		}
 
+		// Determine which runtime to use (flag > config > detect)
+		runtime := runRuntime
+		if runtime == "" {
+			runtime = cfg.ContainerRuntime
+		}
+
 		runConfig := &runner.RunConfig{
 			Path:        runPath,
 			Worktree:    runWorktree,
 			NoWorktree:  runNoWorktree,
 			Env:         runEnv,
 			Verbose:     runVerbose,
+			Runtime:     runtime,
 			Command:     args,
 			Credentials: creds,
 		}
@@ -88,6 +96,7 @@ func init() {
 	runCmd.Flags().StringVar(&runWorktree, "worktree", "", "Worktree name (creates if needed)")
 	runCmd.Flags().BoolVar(&runNoWorktree, "no-worktree", false, "Skip worktree, use directory directly")
 	runCmd.Flags().StringSliceVar(&runEnv, "env", []string{}, "Additional env vars (KEY=value)")
+	runCmd.Flags().StringVar(&runRuntime, "runtime", "", "Container runtime to use (docker/podman/container)")
 	runCmd.Flags().BoolVar(&runVerbose, "verbose", false, "Show all docker/git commands")
 
 	// Credential flags (use pointers so we can detect if they were explicitly set)

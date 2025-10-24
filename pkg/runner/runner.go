@@ -22,6 +22,7 @@ type RunConfig struct {
 	NoWorktree  bool
 	Env         []string
 	Verbose     bool
+	Runtime     string // docker, podman, or container
 	Command     []string
 	Credentials config.Credentials
 }
@@ -122,10 +123,10 @@ func Run(config *RunConfig) error {
 		devConfig = devcontainer.GetDefaultConfig()
 	}
 
-	// Step 4: Initialize Docker client
-	dockerClient, err := docker.NewClient(config.Verbose)
+	// Step 4: Initialize container client
+	dockerClient, err := docker.NewClientWithRuntime(config.Runtime, config.Verbose)
 	if err != nil {
-		return fmt.Errorf("failed to initialize docker: %w", err)
+		return fmt.Errorf("failed to initialize container runtime: %w", err)
 	}
 
 	// Step 5: Ensure image available

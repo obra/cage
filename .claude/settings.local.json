@@ -41,7 +41,8 @@
       "Bash(./packnplay:*)",
       "Bash(git remote set-url:*)",
       "Bash(make help:*)",
-      "Bash(make test:*)"
+      "Bash(make test:*)",
+      "Bash(make build:*)"
     ],
     "deny": [],
     "ask": []

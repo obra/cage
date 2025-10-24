@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/charmbracelet/huh"
@@ -11,6 +12,7 @@ import (
 
 // Config represents packnplay's configuration
 type Config struct {
+	ContainerRuntime   string      `json:"container_runtime"`   // docker, podman, or container
 	DefaultCredentials Credentials `json:"default_credentials"`
 }
 
@@ -82,9 +84,31 @@ func interactiveSetup(configPath string) (*Config, error) {
 	fmt.Println("\n🔐 packnplay First Run Setup")
 	fmt.Println("Configure which credentials to mount in containers by default.")
 
+	// Detect available container runtimes
+	available := detectAvailableRuntimes()
+	if len(available) == 0 {
+		return nil, fmt.Errorf("no container runtime found (tried: docker, podman, container)")
+	}
+
+	var selectedRuntime string
 	var gitCreds, ghCreds, gpgCreds, npmCreds, saveConfig bool
 
+	// Build runtime selection options
+	runtimeOptions := make([]huh.Option[string], len(available))
+	for i, rt := range available {
+		runtimeOptions[i] = huh.NewOption(rt, rt)
+	}
+
 	form := huh.NewForm(
+		// First group: Select container runtime
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Select container runtime").
+				Description("Choose which container CLI to use").
+				Options(runtimeOptions...).
+				Value(&selectedRuntime),
+		),
+		// Second group: Credentials
 		huh.NewGroup(
 			huh.NewConfirm().
 				Title("Enable git credentials?").
@@ -130,6 +154,7 @@ func interactiveSetup(configPath string) (*Config, error) {
 	}
 
 	cfg := &Config{
+		ContainerRuntime: selectedRuntime,
 		DefaultCredentials: Credentials{
 			Git: gitCreds,
 			GH:  ghCreds,
@@ -148,4 +173,18 @@ func interactiveSetup(configPath string) (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// detectAvailableRuntimes finds which container runtimes are installed
+func detectAvailableRuntimes() []string {
+	runtimes := []string{"docker", "podman", "container"}
+	var available []string
+
+	for _, runtime := range runtimes {
+		if _, err := exec.LookPath(runtime); err == nil {
+			available = append(available, runtime)
+		}
+	}
+
+	return available
 }
