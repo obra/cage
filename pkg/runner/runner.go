@@ -510,7 +510,48 @@ func getGHCredentialsFromKeychain(username string) (string, error) {
 		return "", fmt.Errorf("failed to get gh credentials from keychain: %w", err)
 	}
 
-	return strings.TrimSpace(string(output)), nil
+	token := strings.TrimSpace(string(output))
+
+	// gh stores tokens with go-keyring-base64: prefix
+	if strings.HasPrefix(token, "go-keyring-base64:") {
+		encoded := strings.TrimPrefix(token, "go-keyring-base64:")
+		// Decode base64
+		decoded, err := base64Decode(encoded)
+		if err != nil {
+			return "", fmt.Errorf("failed to decode gh token: %w", err)
+		}
+		return decoded, nil
+	}
+
+	return token, nil
+}
+
+func base64Decode(s string) (string, error) {
+	// Try standard base64 decoding
+	var result []byte
+	var err error
+
+	// Try standard encoding first
+	result, err = base64DecodeString(s, "std")
+	if err == nil {
+		return string(result), nil
+	}
+
+	// Try URL encoding
+	result, err = base64DecodeString(s, "url")
+	if err == nil {
+		return string(result), nil
+	}
+
+	return "", fmt.Errorf("failed to decode base64")
+}
+
+func base64DecodeString(s, encoding string) ([]byte, error) {
+	// Import encoding/base64 at package level
+	// For now, use a simple implementation
+	cmd := exec.Command("base64", "-d")
+	cmd.Stdin = strings.NewReader(s)
+	return cmd.Output()
 }
 
 // createCredentialsTempFile creates a temporary file with credentials (mode 600)
