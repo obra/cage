@@ -218,12 +218,12 @@ func Run(config *RunConfig) error {
 	// Mount .claude directory
 	args = append(args, "-v", fmt.Sprintf("%s/.claude:/home/%s/.claude", homeDir, devConfig.RemoteUser))
 
-	// Mount separate credential file outside .claude directory (enables credential sync across containers)
+	// Overlay mount separate credential file on top of .claude mount (enables credential sync across containers)
 	credentialFile, err := getOrCreateContainerCredentialFile(containerName)
 	if err != nil {
 		return fmt.Errorf("failed to get credential file: %w", err)
 	}
-	args = append(args, "-v", fmt.Sprintf("%s:/tmp/packnplay-credentials.json", credentialFile))
+	args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.claude/.credentials.json", credentialFile, devConfig.RemoteUser))
 
 	// Mount workspace at /workspace
 	args = append(args, "-v", fmt.Sprintf("%s:/workspace", mountPath))
@@ -343,14 +343,7 @@ func Run(config *RunConfig) error {
 		}
 	}
 
-	// Create symlink from expected credential location to mounted file
-	if config.Verbose {
-		fmt.Fprintf(os.Stderr, "Creating credential symlink in container...\n")
-	}
-	_, err = dockerClient.Run("exec", containerID, "ln", "-sf", "/tmp/packnplay-credentials.json", fmt.Sprintf("/home/%s/.claude/.credentials.json", devConfig.RemoteUser))
-	if err != nil && config.Verbose {
-		fmt.Fprintf(os.Stderr, "Warning: failed to create credential symlink: %v\n", err)
-	}
+	// Note: .credentials.json is now overlay mounted directly - no symlink needed
 
 	// Step 11: Exec into container with user's command
 	cmdPath, err := exec.LookPath(dockerClient.Command())
