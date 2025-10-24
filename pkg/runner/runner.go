@@ -225,12 +225,12 @@ func Run(config *RunConfig) error {
 			fmt.Fprintf(os.Stderr, "Host has no .credentials.json, using container-managed credentials\n")
 		}
 
-		// Overlay mount separate credential file on top of .claude mount (enables credential sync across containers)
+		// Mount credential file to /tmp and copy to .claude on container start
 		credentialFile, err := getOrCreateContainerCredentialFile(containerName)
 		if err != nil {
 			return fmt.Errorf("failed to get credential file: %w", err)
 		}
-		args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.claude/.credentials.json", credentialFile, devConfig.RemoteUser))
+		args = append(args, "-v", fmt.Sprintf("%s:/tmp/packnplay-credentials.json", credentialFile))
 	} else {
 		if config.Verbose {
 			fmt.Fprintf(os.Stderr, "Using host .credentials.json (no overlay needed)\n")
@@ -355,7 +355,18 @@ func Run(config *RunConfig) error {
 		}
 	}
 
-	// Note: .credentials.json is now overlay mounted directly - no symlink needed
+	// Copy container-managed credentials into place if needed (host has no .credentials.json)
+	hostCredFile2 := filepath.Join(homeDir, ".claude", ".credentials.json")
+	if !fileExists(hostCredFile2) {
+		if config.Verbose {
+			fmt.Fprintf(os.Stderr, "Copying container credentials into .claude directory...\n")
+		}
+		// Copy from mounted temp location to .claude directory
+		_, err = dockerClient.Run("exec", containerID, "cp", "/tmp/packnplay-credentials.json", fmt.Sprintf("/home/%s/.claude/.credentials.json", devConfig.RemoteUser))
+		if err != nil && config.Verbose {
+			fmt.Fprintf(os.Stderr, "Warning: failed to copy credentials: %v\n", err)
+		}
+	}
 
 	// Step 11: Exec into container with user's command
 	cmdPath, err := exec.LookPath(dockerClient.Command())
