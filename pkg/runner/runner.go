@@ -462,8 +462,25 @@ func containerIsRunning(dockerClient *docker.Client, name string) (bool, error) 
 
 	// For Apple Container, output is JSON array
 	if isApple {
-		// Check if any container has matching ID (Apple uses "id" field, not "name")
-		return strings.Contains(output, fmt.Sprintf(`"id":"%s"`, name)), nil
+		// Check if container exists AND is running
+		// Look for: "id":"<name>" followed by "status":"running"
+		idMatch := fmt.Sprintf(`"id":"%s"`, name)
+		if !strings.Contains(output, idMatch) {
+			return false, nil
+		}
+
+		// Find the container object and check if status is running
+		// Simple check: find the id, then check if "status":"running" appears before next "id"
+		idIdx := strings.Index(output, idMatch)
+		nextIdIdx := strings.Index(output[idIdx+len(idMatch):], `"id":"`)
+		var searchRegion string
+		if nextIdIdx == -1 {
+			searchRegion = output[idIdx:]
+		} else {
+			searchRegion = output[idIdx : idIdx+len(idMatch)+nextIdIdx]
+		}
+
+		return strings.Contains(searchRegion, `"status":"running"`), nil
 	}
 
 	// Docker/Podman - simple name matching
