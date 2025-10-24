@@ -82,20 +82,14 @@ func Run(config *RunConfig) error {
 			}
 
 			if exists {
-				// If user explicitly specified the worktree, use the existing one
-				if explicitWorktree {
-					// Get the actual path of the existing worktree
-					actualPath, err := git.GetWorktreePath(worktreeName)
-					if err != nil {
-						return fmt.Errorf("failed to get worktree path: %w", err)
-					}
-					mountPath = actualPath
-					if config.Verbose {
-						fmt.Fprintf(os.Stderr, "Using existing worktree at %s\n", mountPath)
-					}
-				} else {
-					// Auto-detected worktree exists - error to prevent accidents
-					return fmt.Errorf("worktree '%s' already exists. Use --worktree=%s to connect, or --no-worktree to use directory directly", worktreeName, worktreeName)
+				// Worktree already exists - just use it
+				actualPath, err := git.GetWorktreePath(worktreeName)
+				if err != nil {
+					return fmt.Errorf("failed to get worktree path: %w", err)
+				}
+				mountPath = actualPath
+				if config.Verbose {
+					fmt.Fprintf(os.Stderr, "Using existing worktree at %s\n", mountPath)
 				}
 			} else {
 				// Create worktree
