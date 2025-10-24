@@ -274,15 +274,24 @@ func Run(config *RunConfig) error {
 
 	// Mount credentials based on configuration
 	if config.Credentials.Git {
-		// Mount .gitconfig (read-only to prevent accidental changes)
+		// Mount .gitconfig
+		// Note: Apple Container may not support :ro syntax or single file mounts
 		gitconfigPath := filepath.Join(homeDir, ".gitconfig")
 		if fileExists(gitconfigPath) {
-			args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.gitconfig:ro", gitconfigPath, devConfig.RemoteUser))
+			if isAppleRuntime {
+				// Apple Container: skip single file mounts - copy after container starts
+			} else {
+				args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.gitconfig:ro", gitconfigPath, devConfig.RemoteUser))
+			}
 		}
 		// Mount .ssh directory (read-only for security)
 		sshPath := filepath.Join(homeDir, ".ssh")
 		if fileExists(sshPath) {
-			args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.ssh:ro", sshPath, devConfig.RemoteUser))
+			if isAppleRuntime {
+				args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.ssh", sshPath, devConfig.RemoteUser))
+			} else {
+				args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.ssh:ro", sshPath, devConfig.RemoteUser))
+			}
 		}
 	}
 
@@ -391,6 +400,18 @@ func Run(config *RunConfig) error {
 			_, err = dockerClient.Run("exec", containerID, "ln", "-sf", "/tmp/.claude-credentials.json", fmt.Sprintf("/home/%s/.claude/.credentials.json", devConfig.RemoteUser))
 			if err != nil && config.Verbose {
 				fmt.Fprintf(os.Stderr, "Warning: failed to create credentials symlink: %v\n", err)
+			}
+		}
+	}
+
+	// Copy .gitconfig for Apple Container (doesn't support single file mounts)
+	if config.Credentials.Git && isAppleRuntime {
+		gitconfigPath := filepath.Join(homeDir, ".gitconfig")
+		if fileExists(gitconfigPath) {
+			if err := copyFileToContainer(dockerClient, containerID, gitconfigPath, fmt.Sprintf("/home/%s/.gitconfig", devConfig.RemoteUser), devConfig.RemoteUser, config.Verbose); err != nil {
+				if config.Verbose {
+					fmt.Fprintf(os.Stderr, "Warning: failed to copy .gitconfig: %v\n", err)
+				}
 			}
 		}
 	}
