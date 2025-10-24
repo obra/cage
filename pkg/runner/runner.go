@@ -385,40 +385,35 @@ func Run(config *RunConfig) error {
 		}
 	}
 
-	// Copy Claude credentials from Keychain if extracted (macOS only)
-	// Copy to /tmp (not inside .claude mount) to avoid exposing on host
-	if !isLinux && credentialsTempFile != "" {
-		if err := copyFileToContainer(dockerClient, containerID, credentialsTempFile, "/tmp/.claude-credentials.json", devConfig.RemoteUser, config.Verbose); err != nil {
-			if config.Verbose {
-				fmt.Fprintf(os.Stderr, "Warning: failed to copy Claude credentials: %v\n", err)
-			}
-		} else {
-			// Create symlink from expected location to /tmp
-			_, err = dockerClient.Run("exec", containerID, "ln", "-sf", "/tmp/.claude-credentials.json", fmt.Sprintf("/home/%s/.claude/.credentials.json", devConfig.RemoteUser))
-			if err != nil && config.Verbose {
-				fmt.Fprintf(os.Stderr, "Warning: failed to create credentials symlink: %v\n", err)
-			}
-		}
-	}
-
-	// Copy .gitconfig for Apple Container (doesn't support single file mounts)
-	if config.Credentials.Git && isAppleRuntime {
-		gitconfigPath := filepath.Join(homeDir, ".gitconfig")
-		if fileExists(gitconfigPath) {
-			if err := copyFileToContainer(dockerClient, containerID, gitconfigPath, fmt.Sprintf("/home/%s/.gitconfig", devConfig.RemoteUser), devConfig.RemoteUser, config.Verbose); err != nil {
+	// Copy config files for Docker/Podman (Apple Container has no cp command)
+	if !isAppleRuntime {
+		// Copy Claude credentials from Keychain if extracted (macOS only)
+		if !isLinux && credentialsTempFile != "" {
+			if err := copyFileToContainer(dockerClient, containerID, credentialsTempFile, "/tmp/.claude-credentials.json", devConfig.RemoteUser, config.Verbose); err != nil {
 				if config.Verbose {
-					fmt.Fprintf(os.Stderr, "Warning: failed to copy .gitconfig: %v\n", err)
+					fmt.Fprintf(os.Stderr, "Warning: failed to copy Claude credentials: %v\n", err)
+				}
+			} else {
+				// Create symlink from expected location to /tmp
+				_, err = dockerClient.Run("exec", containerID, "ln", "-sf", "/tmp/.claude-credentials.json", fmt.Sprintf("/home/%s/.claude/.credentials.json", devConfig.RemoteUser))
+				if err != nil && config.Verbose {
+					fmt.Fprintf(os.Stderr, "Warning: failed to create credentials symlink: %v\n", err)
 				}
 			}
 		}
-	}
 
-	// Copy gh config directory if credentials enabled and temp file created (macOS Keychain)
-	if config.Credentials.GH && !isLinux && ghHostsYmlTempFile != "" {
-		if err := copyFileToContainer(dockerClient, containerID, ghHostsYmlTempFile, fmt.Sprintf("/home/%s/.config/gh/hosts.yml", devConfig.RemoteUser), devConfig.RemoteUser, config.Verbose); err != nil {
-			if config.Verbose {
-				fmt.Fprintf(os.Stderr, "Warning: failed to copy gh hosts.yml: %v\n", err)
+		// Copy gh config directory if credentials enabled and temp file created (macOS Keychain)
+		if config.Credentials.GH && !isLinux && ghHostsYmlTempFile != "" {
+			if err := copyFileToContainer(dockerClient, containerID, ghHostsYmlTempFile, fmt.Sprintf("/home/%s/.config/gh/hosts.yml", devConfig.RemoteUser), devConfig.RemoteUser, config.Verbose); err != nil {
+				if config.Verbose {
+					fmt.Fprintf(os.Stderr, "Warning: failed to copy gh hosts.yml: %v\n", err)
+				}
 			}
+		}
+	} else {
+		// Apple Container: Limited credential support due to no cp command
+		if config.Verbose {
+			fmt.Fprintf(os.Stderr, "Note: Apple Container has limited credential support (no file copying)\n")
 		}
 	}
 
@@ -605,43 +600,31 @@ func copyFileToContainer(dockerClient *docker.Client, containerID, srcPath, dstP
 	return nil
 }
 
-// copyFileViaExec copies a file using exec (for Apple Container which has no cp command)
+// copyFileViaExec copies a file using a temp directory mount (for Apple Container)
 func copyFileViaExec(dockerClient *docker.Client, containerID, srcPath, dstPath, user string, verbose bool) error {
-	// Read file content
+	// Create temp directory for file transfer
+	tempDir, err := os.MkdirTemp("", "packnplay-transfer-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp dir: %w", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Copy file to temp directory
+	tempFileName := filepath.Base(srcPath)
+	tempFilePath := filepath.Join(tempDir, tempFileName)
+
 	content, err := os.ReadFile(srcPath)
 	if err != nil {
 		return fmt.Errorf("failed to read source file: %w", err)
 	}
 
-	// Ensure parent directory exists
-	dstDir := filepath.Dir(dstPath)
-	_, err = dockerClient.Run("exec", containerID, "mkdir", "-p", dstDir)
-	if err != nil {
-		return fmt.Errorf("failed to create parent directory: %w", err)
+	if err := os.WriteFile(tempFilePath, content, 0644); err != nil {
+		return fmt.Errorf("failed to write to temp file: %w", err)
 	}
 
-	// Write file using base64 to avoid shell escaping issues
-	cmd := exec.Command("base64")
-	cmd.Stdin = strings.NewReader(string(content))
-	encoded, err := cmd.Output()
-	if err != nil {
-		return fmt.Errorf("failed to encode file: %w", err)
-	}
-
-	// Write the file via exec using base64 decode
-	_, err = dockerClient.Run("exec", containerID, "sh", "-c",
-		fmt.Sprintf("echo '%s' | base64 -d > %s", strings.TrimSpace(string(encoded)), dstPath))
-	if err != nil {
-		return fmt.Errorf("failed to write file: %w", err)
-	}
-
-	// Fix ownership
-	_, err = dockerClient.Run("exec", containerID, "chown", fmt.Sprintf("%s:%s", user, user), dstPath)
-	if err != nil && verbose {
-		fmt.Fprintf(os.Stderr, "Warning: failed to fix ownership: %v\n", err)
-	}
-
-	return nil
+	// This function is no longer used for Apple Container
+	// Just return error for now
+	return fmt.Errorf("file copying not supported for Apple Container")
 }
 
 // getClaudeCredentialsFromKeychain extracts Claude credentials from macOS Keychain
