@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/obra/cage/pkg/container"
-	"github.com/obra/cage/pkg/docker"
+	"github.com/obra/packnplay/pkg/container"
+	"github.com/obra/packnplay/pkg/docker"
 	"github.com/spf13/cobra"
 )
 
@@ -29,7 +29,7 @@ var stopCmd = &cobra.Command{
 			return fmt.Errorf("failed to initialize docker: %w", err)
 		}
 
-		// If --all flag, stop all cage-managed containers
+		// If --all flag, stop all packnplay-managed containers
 		if stopAll {
 			return stopAllContainers(dockerClient)
 		}
@@ -80,14 +80,14 @@ func stopContainer(dockerClient *docker.Client, containerName string) error {
 }
 
 func stopAllContainers(dockerClient *docker.Client) error {
-	// Get all cage-managed containers
-	output, err := dockerClient.Run("ps", "--filter", "label=managed-by=cage", "--format", "{{json .}}")
+	// Get all packnplay-managed containers
+	output, err := dockerClient.Run("ps", "--filter", "label=managed-by=packnplay", "--format", "{{json .}}")
 	if err != nil {
 		return fmt.Errorf("failed to list containers: %w", err)
 	}
 
 	if strings.TrimSpace(output) == "" {
-		fmt.Println("No cage-managed containers running")
+		fmt.Println("No packnplay-managed containers running")
 		return nil
 	}
 
@@ -120,5 +120,5 @@ func init() {
 
 	stopCmd.Flags().StringVar(&stopPath, "path", "", "Project path (default: pwd)")
 	stopCmd.Flags().StringVar(&stopWorktree, "worktree", "", "Worktree name")
-	stopCmd.Flags().BoolVar(&stopAll, "all", false, "Stop all cage-managed containers")
+	stopCmd.Flags().BoolVar(&stopAll, "all", false, "Stop all packnplay-managed containers")
 }

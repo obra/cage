@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Build cage, a CLI tool that launches commands (like Claude Code) in isolated Docker containers with automated worktree and dev container management.
+**Goal:** Build packnplay, a CLI tool that launches commands (like Claude Code) in isolated Docker containers with automated worktree and dev container management.
 
 **Architecture:** Single Go binary using cobra for CLI, shells out to docker/git commands, uses idmap mounts for UID translation, session-based container lifecycle with Docker labels for state tracking.
 
@@ -21,8 +21,8 @@
 
 Run:
 ```bash
-cd /home/jesse/git/claude-launcher/.worktrees/cage-impl
-go mod init github.com/jessedrelick/cage
+cd /home/jesse/git/claude-launcher/.worktrees/packnplay-impl
+go mod init github.com/jessedrelick/packnplay
 ```
 
 Expected: `go.mod` created with module declaration
@@ -32,7 +32,7 @@ Expected: `go.mod` created with module declaration
 Create `.gitignore`:
 ```
 # Binaries
-cage
+packnplay
 *.exe
 *.exe~
 *.dll
@@ -68,19 +68,19 @@ package main
 import "fmt"
 
 func main() {
-	fmt.Println("cage")
+	fmt.Println("packnplay")
 }
 ```
 
 **Step 4: Test build**
 
-Run: `go build -o cage .`
+Run: `go build -o packnplay .`
 
-Expected: Binary `cage` created successfully
+Expected: Binary `packnplay` created successfully
 
-Run: `./cage`
+Run: `./packnplay`
 
-Expected: Output "cage"
+Expected: Output "packnplay"
 
 **Step 5: Commit**
 
@@ -130,7 +130,7 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "cage",
+	Use:   "packnplay",
 	Short: "Launch commands in isolated Docker containers",
 	Long: `Cage runs commands (like Claude Code) inside isolated Docker containers
 with automated worktree and dev container management.`,
@@ -262,8 +262,8 @@ import (
 
 var listCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List all cage-managed containers",
-	Long:  `Display all running containers managed by cage.`,
+	Short: "List all packnplay-managed containers",
+	Long:  `Display all running containers managed by packnplay.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		// TODO: implement
 		cmd.Println("list command not yet implemented")
@@ -281,7 +281,7 @@ Modify `main.go`:
 ```go
 package main
 
-import "github.com/jessedrelick/cage/cmd"
+import "github.com/jessedrelick/packnplay/cmd"
 
 func main() {
 	cmd.Execute()
@@ -290,15 +290,15 @@ func main() {
 
 **Step 8: Test CLI structure**
 
-Run: `go build -o cage .`
+Run: `go build -o packnplay .`
 
 Expected: Build succeeds
 
-Run: `./cage --help`
+Run: `./packnplay --help`
 
 Expected: Shows root help with subcommands (run, attach, stop, list)
 
-Run: `./cage run --help`
+Run: `./packnplay run --help`
 
 Expected: Shows run command help with flags
 
@@ -828,13 +828,13 @@ func TestGenerateContainerName(t *testing.T) {
 			name:         "basic naming",
 			projectPath:  "/home/user/myproject",
 			worktreeName: "main",
-			want:         "cage-myproject-main",
+			want:         "packnplay-myproject-main",
 		},
 		{
 			name:         "sanitized worktree name",
 			projectPath:  "/home/user/myproject",
 			worktreeName: "feature/auth",
-			want:         "cage-myproject-feature-auth",
+			want:         "packnplay-myproject-feature-auth",
 		},
 	}
 
@@ -851,16 +851,16 @@ func TestGenerateContainerName(t *testing.T) {
 func TestGenerateLabels(t *testing.T) {
 	labels := GenerateLabels("myproject", "feature-auth")
 
-	if labels["managed-by"] != "cage" {
-		t.Errorf("managed-by label = %v, want cage", labels["managed-by"])
+	if labels["managed-by"] != "packnplay" {
+		t.Errorf("managed-by label = %v, want packnplay", labels["managed-by"])
 	}
 
-	if labels["cage-project"] != "myproject" {
-		t.Errorf("cage-project label = %v, want myproject", labels["cage-project"])
+	if labels["packnplay-project"] != "myproject" {
+		t.Errorf("packnplay-project label = %v, want myproject", labels["packnplay-project"])
 	}
 
-	if labels["cage-worktree"] != "feature-auth" {
-		t.Errorf("cage-worktree label = %v, want feature-auth", labels["cage-worktree"])
+	if labels["packnplay-worktree"] != "feature-auth" {
+		t.Errorf("packnplay-worktree label = %v, want feature-auth", labels["packnplay-worktree"])
 	}
 }
 ```
@@ -887,7 +887,7 @@ import (
 func GenerateContainerName(projectPath, worktreeName string) string {
 	projectName := filepath.Base(projectPath)
 	sanitizedWorktree := sanitizeName(worktreeName)
-	return fmt.Sprintf("cage-%s-%s", projectName, sanitizedWorktree)
+	return fmt.Sprintf("packnplay-%s-%s", projectName, sanitizedWorktree)
 }
 
 // sanitizeName converts a name to docker-compatible format
@@ -899,12 +899,12 @@ func sanitizeName(name string) string {
 	return name
 }
 
-// GenerateLabels creates Docker labels for cage-managed containers
+// GenerateLabels creates Docker labels for packnplay-managed containers
 func GenerateLabels(projectName, worktreeName string) map[string]string {
 	return map[string]string{
-		"managed-by":    "cage",
-		"cage-project":  projectName,
-		"cage-worktree": worktreeName,
+		"managed-by":    "packnplay",
+		"packnplay-project":  projectName,
+		"packnplay-worktree": worktreeName,
 	}
 }
 
@@ -930,16 +930,16 @@ Expected: PASS
 git add pkg/container/
 git commit -m "feat: add container naming and label management
 
-- Implement GenerateContainerName() for cage-<project>-<worktree> pattern
+- Implement GenerateContainerName() for packnplay-<project>-<worktree> pattern
 - Add sanitizeName() to ensure Docker-compatible names
-- Add GenerateLabels() to create cage management labels
+- Add GenerateLabels() to create packnplay management labels
 - Add LabelsToArgs() to convert labels to docker CLI args
 - Add tests for name generation and label creation"
 ```
 
 ---
 
-## Task 7: Implement `cage run` Command Logic
+## Task 7: Implement `packnplay run` Command Logic
 
 **Files:**
 - Modify: `cmd/run.go`
@@ -962,10 +962,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/jessedrelick/cage/pkg/container"
-	"github.com/jessedrelick/cage/pkg/devcontainer"
-	"github.com/jessedrelick/cage/pkg/docker"
-	"github.com/jessedrelick/cage/pkg/git"
+	"github.com/jessedrelick/packnplay/pkg/container"
+	"github.com/jessedrelick/packnplay/pkg/devcontainer"
+	"github.com/jessedrelick/packnplay/pkg/docker"
+	"github.com/jessedrelick/packnplay/pkg/git"
 )
 
 type RunConfig struct {
@@ -1075,7 +1075,7 @@ func Run(config *RunConfig) error {
 	if isRunning, err := containerIsRunning(dockerClient, containerName); err != nil {
 		return fmt.Errorf("failed to check container status: %w", err)
 	} else if isRunning {
-		return fmt.Errorf("container already running. Use 'cage attach --worktree=%s' or 'cage stop --worktree=%s'", worktreeName, worktreeName)
+		return fmt.Errorf("container already running. Use 'packnplay attach --worktree=%s' or 'packnplay stop --worktree=%s'", worktreeName, worktreeName)
 	}
 
 	// Step 8: Build docker run command
@@ -1128,7 +1128,7 @@ func Run(config *RunConfig) error {
 	// Add image
 	imageName := devConfig.Image
 	if devConfig.DockerFile != "" {
-		imageName = fmt.Sprintf("cage-%s-devcontainer:latest", projectName)
+		imageName = fmt.Sprintf("packnplay-%s-devcontainer:latest", projectName)
 	}
 	args = append(args, imageName)
 
@@ -1152,7 +1152,7 @@ func ensureImage(dockerClient *docker.Client, config *devcontainer.Config, proje
 	if config.DockerFile != "" {
 		// Need to build from Dockerfile
 		projectName := filepath.Base(projectPath)
-		imageName = fmt.Sprintf("cage-%s-devcontainer:latest", projectName)
+		imageName = fmt.Sprintf("packnplay-%s-devcontainer:latest", projectName)
 
 		// Check if already built
 		_, err := dockerClient.Run("image", "inspect", imageName)
@@ -1219,7 +1219,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/jessedrelick/cage/pkg/runner"
+	"github.com/jessedrelick/packnplay/pkg/runner"
 	"github.com/spf13/cobra"
 )
 
@@ -1304,7 +1304,7 @@ func (c *Client) Command() string {
 
 **Step 5: Build and test manually**
 
-Run: `go build -o cage .`
+Run: `go build -o packnplay .`
 
 Expected: Build succeeds (may have import errors to fix with `go mod tidy`)
 
@@ -1314,7 +1314,7 @@ Run: `go mod tidy`
 
 ```bash
 git add cmd/run.go pkg/runner/ pkg/docker/client.go
-git commit -m "feat: implement cage run command logic
+git commit -m "feat: implement packnplay run command logic
 
 - Create runner package with Run() function
 - Implement worktree management logic (auto-create, check existence, no-worktree mode)
@@ -1330,7 +1330,7 @@ git commit -m "feat: implement cage run command logic
 
 ---
 
-## Task 8: Implement `cage attach` Command
+## Task 8: Implement `packnplay attach` Command
 
 **Files:**
 - Modify: `cmd/attach.go`
@@ -1349,8 +1349,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/jessedrelick/cage/pkg/container"
-	"github.com/jessedrelick/cage/pkg/docker"
+	"github.com/jessedrelick/packnplay/pkg/container"
+	"github.com/jessedrelick/packnplay/pkg/docker"
 	"github.com/spf13/cobra"
 )
 
@@ -1432,7 +1432,7 @@ func init() {
 
 **Step 2: Build and test**
 
-Run: `go build -o cage .`
+Run: `go build -o packnplay .`
 
 Expected: Build succeeds
 
@@ -1440,7 +1440,7 @@ Expected: Build succeeds
 
 ```bash
 git add cmd/attach.go
-git commit -m "feat: implement cage attach command
+git commit -m "feat: implement packnplay attach command
 
 - Add attach command logic to connect to running containers
 - Require --worktree flag to identify container
@@ -1451,7 +1451,7 @@ git commit -m "feat: implement cage attach command
 
 ---
 
-## Task 9: Implement `cage stop` Command
+## Task 9: Implement `packnplay stop` Command
 
 **Files:**
 - Modify: `cmd/stop.go`
@@ -1467,8 +1467,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/jessedrelick/cage/pkg/container"
-	"github.com/jessedrelick/cage/pkg/docker"
+	"github.com/jessedrelick/packnplay/pkg/container"
+	"github.com/jessedrelick/packnplay/pkg/docker"
 	"github.com/spf13/cobra"
 )
 
@@ -1540,7 +1540,7 @@ func init() {
 
 **Step 2: Build and test**
 
-Run: `go build -o cage .`
+Run: `go build -o packnplay .`
 
 Expected: Build succeeds
 
@@ -1548,7 +1548,7 @@ Expected: Build succeeds
 
 ```bash
 git add cmd/stop.go
-git commit -m "feat: implement cage stop command
+git commit -m "feat: implement packnplay stop command
 
 - Add stop command to stop and remove containers
 - Require --worktree flag to identify container
@@ -1558,7 +1558,7 @@ git commit -m "feat: implement cage stop command
 
 ---
 
-## Task 10: Implement `cage list` Command
+## Task 10: Implement `packnplay list` Command
 
 **Files:**
 - Modify: `cmd/list.go`
@@ -1575,7 +1575,7 @@ import (
 	"os"
 	"text/tabwriter"
 
-	"github.com/jessedrelick/cage/pkg/docker"
+	"github.com/jessedrelick/packnplay/pkg/docker"
 	"github.com/spf13/cobra"
 )
 
@@ -1587,8 +1587,8 @@ type ContainerInfo struct {
 
 var listCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List all cage-managed containers",
-	Long:  `Display all running containers managed by cage.`,
+	Short: "List all packnplay-managed containers",
+	Long:  `Display all running containers managed by packnplay.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Initialize Docker client
 		dockerClient, err := docker.NewClient(false)
@@ -1596,10 +1596,10 @@ var listCmd = &cobra.Command{
 			return fmt.Errorf("failed to initialize docker: %w", err)
 		}
 
-		// Get all cage-managed containers
+		// Get all packnplay-managed containers
 		output, err := dockerClient.Run(
 			"ps",
-			"--filter", "label=managed-by=cage",
+			"--filter", "label=managed-by=packnplay",
 			"--format", "{{json .}}",
 		)
 		if err != nil {
@@ -1607,7 +1607,7 @@ var listCmd = &cobra.Command{
 		}
 
 		if output == "" {
-			fmt.Println("No cage-managed containers running")
+			fmt.Println("No packnplay-managed containers running")
 			return nil
 		}
 
@@ -1665,9 +1665,9 @@ func parseLabels(labels string) (project, worktree string) {
 	for _, pair := range pairs {
 		kv := splitByEquals(pair)
 		if len(kv) == 2 {
-			if kv[0] == "cage-project" {
+			if kv[0] == "packnplay-project" {
 				project = kv[1]
-			} else if kv[0] == "cage-worktree" {
+			} else if kv[0] == "packnplay-worktree" {
 				worktree = kv[1]
 			}
 		}
@@ -1706,7 +1706,7 @@ func init() {
 
 **Step 2: Build and test**
 
-Run: `go build -o cage .`
+Run: `go build -o packnplay .`
 
 Expected: Build succeeds
 
@@ -1714,10 +1714,10 @@ Expected: Build succeeds
 
 ```bash
 git add cmd/list.go
-git commit -m "feat: implement cage list command
+git commit -m "feat: implement packnplay list command
 
-- Add list command to show cage-managed containers
-- Filter containers by managed-by=cage label
+- Add list command to show packnplay-managed containers
+- Filter containers by managed-by=packnplay label
 - Parse JSON output from docker ps
 - Display table with container name, status, project, and worktree
 - Handle empty results gracefully"
@@ -1752,7 +1752,7 @@ Modify the `Run` function in `pkg/runner/runner.go` - change the docker run appr
 	// Add image
 	imageName := devConfig.Image
 	if devConfig.DockerFile != "" {
-		imageName = fmt.Sprintf("cage-%s-devcontainer:latest", projectName)
+		imageName = fmt.Sprintf("packnplay-%s-devcontainer:latest", projectName)
 	}
 	args = append(args, imageName)
 
@@ -1807,7 +1807,7 @@ Modify the `Run` function in `pkg/runner/runner.go` - change the docker run appr
 
 **Step 2: Test build**
 
-Run: `go build -o cage .`
+Run: `go build -o packnplay .`
 
 Expected: Build succeeds
 
@@ -1850,14 +1850,14 @@ Cage launches commands (like Claude Code) inside isolated Docker containers with
 ## Installation
 
 ```bash
-go build -o cage .
-sudo mv cage /usr/local/bin/
+go build -o packnplay .
+sudo mv packnplay /usr/local/bin/
 ```
 
 Or install directly:
 
 ```bash
-go install github.com/jessedrelick/cage@latest
+go install github.com/jessedrelick/packnplay@latest
 ```
 
 ## Usage
@@ -1865,50 +1865,50 @@ go install github.com/jessedrelick/cage@latest
 ### Run a command in a container
 
 ```bash
-cage run 'claude --dangerously-skip-permissions'
+packnplay run 'claude --dangerously-skip-permissions'
 ```
 
 ### Specify a worktree
 
 ```bash
-cage run --worktree=feature-auth claude
+packnplay run --worktree=feature-auth claude
 ```
 
 ### Use current directory without worktree
 
 ```bash
-cage run --no-worktree bash
+packnplay run --no-worktree bash
 ```
 
 ### Add environment variables
 
 ```bash
-cage run --env DEBUG=1 --env LOG_LEVEL=trace claude
+packnplay run --env DEBUG=1 --env LOG_LEVEL=trace claude
 ```
 
 ### Attach to running container
 
 ```bash
-cage attach --worktree=feature-auth
+packnplay attach --worktree=feature-auth
 ```
 
 ### Stop a container
 
 ```bash
-cage stop --worktree=feature-auth
+packnplay stop --worktree=feature-auth
 ```
 
 ### List all containers
 
 ```bash
-cage list
+packnplay list
 ```
 
 ## How It Works
 
 ### Worktree Management
 
-- **Auto-create**: If you're in a git repo, cage creates a worktree based on current branch
+- **Auto-create**: If you're in a git repo, packnplay creates a worktree based on current branch
 - **Explicit**: Use `--worktree=<name>` to specify or create a worktree
 - **Skip**: Use `--no-worktree` to use directory directly
 - **Collision detection**: Errors if worktree already exists (prevents accidents)
@@ -1929,7 +1929,7 @@ cage list
 ### Container Lifecycle
 
 - Session-based: container runs until command exits
-- Labeled: all containers tagged with `managed-by=cage`
+- Labeled: all containers tagged with `managed-by=packnplay`
 - Multiple sessions can attach to running containers
 
 ## Requirements
@@ -1941,29 +1941,29 @@ cage list
 
 ## Environment Variables
 
-- `DOCKER_CMD`: Override docker command (e.g., `DOCKER_CMD=podman cage run ...`)
+- `DOCKER_CMD`: Override docker command (e.g., `DOCKER_CMD=podman packnplay run ...`)
 
 ## Examples
 
 ```bash
 # Run Claude in auto-created worktree
 cd ~/myproject
-cage run claude
+packnplay run claude
 
 # Run in specific worktree with debug logging
-cage run --worktree=bug-fix --env DEBUG=1 --verbose claude
+packnplay run --worktree=bug-fix --env DEBUG=1 --verbose claude
 
 # Get a shell in the container
-cage run --worktree=feature bash
+packnplay run --worktree=feature bash
 
 # Attach to running container
-cage attach --worktree=feature
+packnplay attach --worktree=feature
 
 # List all running containers
-cage list
+packnplay list
 
 # Stop container
-cage stop --worktree=feature
+packnplay stop --worktree=feature
 ```
 
 ## License
@@ -1994,17 +1994,17 @@ git commit -m "docs: add README with usage and examples
 
 **Step 1: Build final binary**
 
-Run: `go build -o cage .`
+Run: `go build -o packnplay .`
 
 Expected: Clean build
 
 **Step 2: Test basic functionality**
 
 Test plan:
-1. `./cage --help` - verify help output
-2. `./cage run --help` - verify run command help
+1. `./packnplay --help` - verify help output
+2. `./packnplay run --help` - verify run command help
 3. Create a test directory with git repo
-4. Try `./cage run --no-worktree echo "hello"`
+4. Try `./packnplay run --no-worktree echo "hello"`
 5. Check for any runtime errors
 
 **Step 3: Fix any bugs discovered**
@@ -2023,7 +2023,7 @@ Run: `go mod tidy`
 
 ```bash
 git add .
-git commit -m "test: verify cage functionality and fix bugs
+git commit -m "test: verify packnplay functionality and fix bugs
 
 - Build and test all commands
 - Fix any runtime issues discovered

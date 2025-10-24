@@ -8,9 +8,9 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "cage",
+	Use:   "packnplay",
 	Short: "Launch commands in isolated Docker containers",
-	Long: `Cage runs commands (like Claude Code) inside isolated Docker containers
+	Long: `Pack 'n Play runs commands (like Claude Code) inside isolated Docker containers
 with automated worktree and dev container management.`,
 }
 

@@ -9,11 +9,11 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/obra/cage/pkg/config"
-	"github.com/obra/cage/pkg/container"
-	"github.com/obra/cage/pkg/devcontainer"
-	"github.com/obra/cage/pkg/docker"
-	"github.com/obra/cage/pkg/git"
+	"github.com/obra/packnplay/pkg/config"
+	"github.com/obra/packnplay/pkg/container"
+	"github.com/obra/packnplay/pkg/devcontainer"
+	"github.com/obra/packnplay/pkg/docker"
+	"github.com/obra/packnplay/pkg/git"
 )
 
 type RunConfig struct {
@@ -339,7 +339,7 @@ func Run(config *RunConfig) error {
 	// Add image
 	imageName := devConfig.Image
 	if devConfig.DockerFile != "" {
-		imageName = fmt.Sprintf("cage-%s-devcontainer:latest", projectName)
+		imageName = fmt.Sprintf("packnplay-%s-devcontainer:latest", projectName)
 	}
 	args = append(args, imageName)
 
@@ -402,7 +402,7 @@ func ensureImage(dockerClient *docker.Client, config *devcontainer.Config, proje
 	if config.DockerFile != "" {
 		// Need to build from Dockerfile
 		projectName := filepath.Base(projectPath)
-		imageName = fmt.Sprintf("cage-%s-devcontainer:latest", projectName)
+		imageName = fmt.Sprintf("packnplay-%s-devcontainer:latest", projectName)
 
 		// Check if already built
 		_, err := dockerClient.Run("image", "inspect", imageName)
@@ -556,7 +556,7 @@ func base64DecodeString(s, encoding string) ([]byte, error) {
 
 // createCredentialsTempFile creates a temporary file with credentials (mode 600)
 func createCredentialsTempFile(credentials string) (string, error) {
-	tmpFile, err := os.CreateTemp("", "cage-credentials-*.json")
+	tmpFile, err := os.CreateTemp("", "packnplay-credentials-*.json")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp file: %w", err)
 	}
@@ -619,7 +619,7 @@ func createGHHostsYmlFromKeychain(homeDir string, verbose bool) (string, error) 
     git_protocol: https
 `, username, token)
 
-	tmpFile, err := os.CreateTemp("", "cage-gh-hosts-*.yml")
+	tmpFile, err := os.CreateTemp("", "packnplay-gh-hosts-*.yml")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temp file: %w", err)
 	}

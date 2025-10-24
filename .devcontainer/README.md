@@ -1,6 +1,6 @@
-# Cage Default Dev Container
+# Pack 'n Play Default Dev Container
 
-This is the default dev container used by cage when a project doesn't have its own `.devcontainer/devcontainer.json`.
+This is the default dev container used by packnplay when a project doesn't have its own `.devcontainer/devcontainer.json`.
 
 ## What's Included
 
@@ -15,17 +15,17 @@ This is the default dev container used by cage when a project doesn't have its o
 
 ## Building the Image
 
-To build and publish the default cage container:
+To build and publish the default packnplay container:
 
 ```bash
 # Build locally
-docker build -t ghcr.io/obra/cage-default:latest .devcontainer/
+docker build -t ghcr.io/obra/packnplay-default:latest .devcontainer/
 
 # Test it
-docker run -it --rm ghcr.io/obra/cage-default:latest bash
+docker run -it --rm ghcr.io/obra/packnplay-default:latest bash
 
 # Push to GitHub Container Registry (requires authentication)
-docker push ghcr.io/obra/cage-default:latest
+docker push ghcr.io/obra/packnplay-default:latest
 ```
 
 ## Using in Your Project
@@ -34,7 +34,7 @@ Projects can extend this by creating their own `.devcontainer/devcontainer.json`
 
 ```json
 {
-  "image": "ghcr.io/obra/cage-default:latest",
+  "image": "ghcr.io/obra/packnplay-default:latest",
   "remoteUser": "vscode"
 }
 ```

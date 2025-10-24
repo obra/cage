@@ -6,7 +6,7 @@ import (
 	"os"
 	"text/tabwriter"
 
-	"github.com/obra/cage/pkg/docker"
+	"github.com/obra/packnplay/pkg/docker"
 	"github.com/spf13/cobra"
 )
 
@@ -18,8 +18,8 @@ type ContainerInfo struct {
 
 var listCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List all cage-managed containers",
-	Long:  `Display all running containers managed by cage.`,
+	Short: "List all packnplay-managed containers",
+	Long:  `Display all running containers managed by packnplay.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Initialize Docker client
 		dockerClient, err := docker.NewClient(false)
@@ -27,10 +27,10 @@ var listCmd = &cobra.Command{
 			return fmt.Errorf("failed to initialize docker: %w", err)
 		}
 
-		// Get all cage-managed containers
+		// Get all packnplay-managed containers
 		output, err := dockerClient.Run(
 			"ps",
-			"--filter", "label=managed-by=cage",
+			"--filter", "label=managed-by=packnplay",
 			"--format", "{{json .}}",
 		)
 		if err != nil {
@@ -38,7 +38,7 @@ var listCmd = &cobra.Command{
 		}
 
 		if output == "" {
-			fmt.Println("No cage-managed containers running")
+			fmt.Println("No packnplay-managed containers running")
 			return nil
 		}
 
@@ -96,9 +96,9 @@ func parseLabels(labels string) (project, worktree string) {
 	for _, pair := range pairs {
 		kv := splitByEquals(pair)
 		if len(kv) == 2 {
-			if kv[0] == "cage-project" {
+			if kv[0] == "packnplay-project" {
 				project = kv[1]
-			} else if kv[0] == "cage-worktree" {
+			} else if kv[0] == "packnplay-worktree" {
 				worktree = kv[1]
 			}
 		}

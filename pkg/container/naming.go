@@ -10,7 +10,7 @@ import (
 func GenerateContainerName(projectPath, worktreeName string) string {
 	projectName := filepath.Base(projectPath)
 	sanitizedWorktree := sanitizeName(worktreeName)
-	return fmt.Sprintf("cage-%s-%s", projectName, sanitizedWorktree)
+	return fmt.Sprintf("packnplay-%s-%s", projectName, sanitizedWorktree)
 }
 
 // sanitizeName converts a name to docker-compatible format
@@ -22,12 +22,12 @@ func sanitizeName(name string) string {
 	return name
 }
 
-// GenerateLabels creates Docker labels for cage-managed containers
+// GenerateLabels creates Docker labels for packnplay-managed containers
 func GenerateLabels(projectName, worktreeName string) map[string]string {
 	return map[string]string{
-		"managed-by":    "cage",
-		"cage-project":  projectName,
-		"cage-worktree": worktreeName,
+		"managed-by":    "packnplay",
+		"packnplay-project":  projectName,
+		"packnplay-worktree": worktreeName,
 	}
 }
 

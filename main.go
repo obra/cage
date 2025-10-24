@@ -1,6 +1,6 @@
 package main
 
-import "github.com/obra/cage/cmd"
+import "github.com/obra/packnplay/cmd"
 
 func main() {
 	cmd.Execute()

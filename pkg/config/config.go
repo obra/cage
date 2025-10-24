@@ -9,7 +9,7 @@ import (
 	"github.com/charmbracelet/huh"
 )
 
-// Config represents cage's configuration
+// Config represents packnplay's configuration
 type Config struct {
 	DefaultCredentials Credentials `json:"default_credentials"`
 }
@@ -29,7 +29,7 @@ func GetConfigPath() string {
 		home, _ := os.UserHomeDir()
 		configHome = filepath.Join(home, ".config")
 	}
-	return filepath.Join(configHome, "cage", "config.json")
+	return filepath.Join(configHome, "packnplay", "config.json")
 }
 
 // Load loads the config file, or prompts for interactive setup if not found

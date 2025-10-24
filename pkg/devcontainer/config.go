@@ -43,7 +43,7 @@ func LoadConfig(projectPath string) (*Config, error) {
 // GetDefaultConfig returns the default devcontainer config
 func GetDefaultConfig() *Config {
 	return &Config{
-		Image:      "ghcr.io/obra/cage-default:latest",
+		Image:      "ghcr.io/obra/packnplay-default:latest",
 		RemoteUser: "vscode",
 	}
 }

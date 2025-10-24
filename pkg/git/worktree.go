@@ -9,7 +9,7 @@ import (
 )
 
 // DetermineWorktreePath calculates the path for a worktree
-// Uses XDG-compliant location: ~/.local/share/cage/worktrees/<project>/<worktree>
+// Uses XDG-compliant location: ~/.local/share/packnplay/worktrees/<project>/<worktree>
 func DetermineWorktreePath(projectPath, worktreeName string) string {
 	projectName := filepath.Base(projectPath)
 	sanitizedName := sanitizeBranchName(worktreeName)
@@ -22,13 +22,13 @@ func DetermineWorktreePath(projectPath, worktreeName string) string {
 		return filepath.Join(parentDir, fmt.Sprintf("%s-%s", projectName, sanitizedName))
 	}
 
-	// XDG-compliant path: ~/.local/share/cage/worktrees/<project>/<worktree>
+	// XDG-compliant path: ~/.local/share/packnplay/worktrees/<project>/<worktree>
 	xdgDataHome := os.Getenv("XDG_DATA_HOME")
 	if xdgDataHome == "" {
 		xdgDataHome = filepath.Join(homeDir, ".local", "share")
 	}
 
-	worktreePath := filepath.Join(xdgDataHome, "cage", "worktrees", projectName, sanitizedName)
+	worktreePath := filepath.Join(xdgDataHome, "packnplay", "worktrees", projectName, sanitizedName)
 
 	// Ensure parent directory exists
 	os.MkdirAll(filepath.Dir(worktreePath), 0755)

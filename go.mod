@@ -1,4 +1,4 @@
-module github.com/obra/cage
+module github.com/obra/packnplay
 
 go 1.23.0
 

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/obra/cage/pkg/config"
-	"github.com/obra/cage/pkg/runner"
+	"github.com/obra/packnplay/pkg/config"
+	"github.com/obra/packnplay/pkg/runner"
 	"github.com/spf13/cobra"
 )
 

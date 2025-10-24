@@ -15,13 +15,13 @@ func TestGenerateContainerName(t *testing.T) {
 			name:         "basic naming",
 			projectPath:  "/home/user/myproject",
 			worktreeName: "main",
-			want:         "cage-myproject-main",
+			want:         "packnplay-myproject-main",
 		},
 		{
 			name:         "sanitized worktree name",
 			projectPath:  "/home/user/myproject",
 			worktreeName: "feature/auth",
-			want:         "cage-myproject-feature-auth",
+			want:         "packnplay-myproject-feature-auth",
 		},
 	}
 
@@ -38,15 +38,15 @@ func TestGenerateContainerName(t *testing.T) {
 func TestGenerateLabels(t *testing.T) {
 	labels := GenerateLabels("myproject", "feature-auth")
 
-	if labels["managed-by"] != "cage" {
-		t.Errorf("managed-by label = %v, want cage", labels["managed-by"])
+	if labels["managed-by"] != "packnplay" {
+		t.Errorf("managed-by label = %v, want packnplay", labels["managed-by"])
 	}
 
-	if labels["cage-project"] != "myproject" {
-		t.Errorf("cage-project label = %v, want myproject", labels["cage-project"])
+	if labels["packnplay-project"] != "myproject" {
+		t.Errorf("packnplay-project label = %v, want myproject", labels["packnplay-project"])
 	}
 
-	if labels["cage-worktree"] != "feature-auth" {
-		t.Errorf("cage-worktree label = %v, want feature-auth", labels["cage-worktree"])
+	if labels["packnplay-worktree"] != "feature-auth" {
+		t.Errorf("packnplay-worktree label = %v, want feature-auth", labels["packnplay-worktree"])
 	}
 }

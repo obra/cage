@@ -16,19 +16,19 @@ Cage launches Claude Code (and other tools) inside isolated Docker containers to
 
 ### Core Components
 
-**Single Go binary (`cage`):**
+**Single Go binary (`packnplay`):**
 - Shells out to Docker CLI (not SDK) for compatibility with docker/podman/etc
 - Simple command structure with flags
 - No daemon or background processes
 - Container state tracked via Docker itself (no separate state files)
 
 **Container lifecycle:**
-- Session-based: containers start with `cage run`, stop when command exits
+- Session-based: containers start with `packnplay run`, stop when command exits
 - Multiple sessions can attach to running containers
 - Containers persist after stopping (for log inspection)
 
 **State management:**
-- Docker labels track cage-managed containers
+- Docker labels track packnplay-managed containers
 - `docker ps` is source of truth for running containers
 - No complex state files or registries
 
@@ -36,7 +36,7 @@ Cage launches Claude Code (and other tools) inside isolated Docker containers to
 
 ```bash
 # Run command in container
-cage run [flags] [command...]
+packnplay run [flags] [command...]
   --path=<dir>           # Project path (default: pwd)
   --worktree=<name>      # Worktree name (creates if needed)
   --no-worktree          # Skip worktree, use directory directly
@@ -44,22 +44,22 @@ cage run [flags] [command...]
   --verbose              # Show all docker/git commands
 
 # Attach to running container (interactive shell)
-cage attach [flags]
+packnplay attach [flags]
 
 # Stop container
-cage stop [flags]
+packnplay stop [flags]
 
-# List all cage-managed containers
-cage list
+# List all packnplay-managed containers
+packnplay list
 ```
 
 **Examples:**
 ```bash
-cage run 'claude --dangerously-skip-permissions'
-cage run --worktree=feature-auth --env DEBUG=1 claude
-cage run --path=/home/jesse/myproject codex
-cage run --no-worktree bash
-cage attach --worktree=feature-auth
+packnplay run 'claude --dangerously-skip-permissions'
+packnplay run --worktree=feature-auth --env DEBUG=1 claude
+packnplay run --path=/home/jesse/myproject codex
+packnplay run --no-worktree bash
+packnplay attach --worktree=feature-auth
 ```
 
 ## Worktree Management
@@ -102,7 +102,7 @@ cage attach --worktree=feature-auth
    - Parse JSON for `image` or `dockerFile` field
    - Extract `remoteUser` (default to `devuser`)
    - Use project's dev container config
-3. If not found: use cage's default dev container
+3. If not found: use packnplay's default dev container
 
 ### Image Handling
 
@@ -112,12 +112,12 @@ cage attach --worktree=feature-auth
 3. If pull fails: error with clear message
 
 **For `dockerFile` field:**
-1. Check for built image: `cage-<project-name>-devcontainer:latest`
-2. If missing: `docker build -f .devcontainer/Dockerfile -t cage-<project-name>-devcontainer:latest .devcontainer`
+1. Check for built image: `packnplay-<project-name>-devcontainer:latest`
+2. If missing: `docker build -f .devcontainer/Dockerfile -t packnplay-<project-name>-devcontainer:latest .devcontainer`
 3. If build fails: error with docker output
 
 **Default container:**
-- Reference: `mcr.microsoft.com/devcontainers/base:ubuntu` (or custom `cage-default:latest`)
+- Reference: `mcr.microsoft.com/devcontainers/base:ubuntu` (or custom `packnplay-default:latest`)
 - Auto-pull on first run
 - Contains: git, curl, wget, build-essential, common dev tools
 - Default user: `devuser` (UID 1000)
@@ -168,26 +168,26 @@ This maps host UID to container UID 1000, allowing container to run as `devuser`
 
 ### Container Naming
 
-Pattern: `cage-<project-name>-<worktree-name>`
+Pattern: `packnplay-<project-name>-<worktree-name>`
 
 Examples:
-- `cage-myproject-feature-auth`
-- `cage-claude-launcher-main`
+- `packnplay-myproject-feature-auth`
+- `packnplay-claude-launcher-main`
 
 ### Container Labels
 
 Add to all containers:
 ```bash
---label managed-by=cage
---label cage-project=<project-name>
---label cage-worktree=<worktree-name>
+--label managed-by=packnplay
+--label packnplay-project=<project-name>
+--label packnplay-worktree=<worktree-name>
 ```
 
-### On `cage run`
+### On `packnplay run`
 
 1. Generate container name from project + worktree
 2. Check if running: `docker ps --filter name=<name>`
-3. If running: **ERROR** - "Container already running. Use 'cage attach' or 'cage stop'"
+3. If running: **ERROR** - "Container already running. Use 'packnplay attach' or 'packnplay stop'"
 4. If not running:
    - Ensure image available (pull/build if needed)
    - Create container with all mounts and env vars
@@ -195,21 +195,21 @@ Add to all containers:
    - Execute command
 5. Container stops when command exits (no `--rm`)
 
-### On `cage attach`
+### On `packnplay attach`
 
 1. Find container by name (from --path and --worktree)
 2. If not running: **ERROR** - "No running container found"
 3. If running: `docker exec -it <container> /bin/bash`
 
-### On `cage stop`
+### On `packnplay stop`
 
 1. Find container by name
 2. `docker stop <container>`
 3. `docker rm <container>`
 
-### On `cage list`
+### On `packnplay list`
 
-1. `docker ps --filter label=managed-by=cage --format json`
+1. `docker ps --filter label=managed-by=packnplay --format json`
 2. Parse and display: project, worktree, container name, uptime
 
 ## Error Handling
@@ -225,8 +225,8 @@ Add to all containers:
 - Image pull/build failures: show full output
 
 **Container state errors:**
-- Already running: show `cage attach` and `cage stop` options
-- Not running: suggest `cage run`
+- Already running: show `packnplay attach` and `packnplay stop` options
+- Not running: suggest `packnplay run`
 
 ### Verbosity
 
@@ -243,7 +243,7 @@ Add to all containers:
 
 1. Check for `docker` in PATH
 2. If not found: check for `podman`
-3. Allow override: `DOCKER_CMD=podman cage run ...`
+3. Allow override: `DOCKER_CMD=podman packnplay run ...`
 4. Error if no compatible CLI found
 
 ### Exit Codes
@@ -279,7 +279,7 @@ For MVP:
 ### Future Enhancements
 
 Not in MVP:
-- `cage clean` command (remove stopped containers)
+- `packnplay clean` command (remove stopped containers)
 - Long-running container mode (keep alive between sessions)
 - More devcontainer.json feature support
 - Container resource limits (CPU, memory)
