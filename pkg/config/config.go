@@ -55,6 +55,34 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("failed to parse config: %w", err)
 	}
 
+	// If container_runtime is not set, prompt for it
+	if cfg.ContainerRuntime == "" {
+		return interactiveSetup(configPath)
+	}
+
+	return &cfg, nil
+}
+
+// LoadWithoutRuntimeCheck loads config without prompting for runtime
+func LoadWithoutRuntimeCheck() (*Config, error) {
+	configPath := GetConfigPath()
+
+	// Check if config exists
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		return nil, fmt.Errorf("config not found")
+	}
+
+	// Load existing config
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config: %w", err)
+	}
+
+	var cfg Config
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return nil, fmt.Errorf("failed to parse config: %w", err)
+	}
+
 	return &cfg, nil
 }
 

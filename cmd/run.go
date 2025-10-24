@@ -30,10 +30,30 @@ var runCmd = &cobra.Command{
 	Long:  `Start a container and execute the specified command inside it.`,
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// Load configuration (interactive setup on first run)
-		cfg, err := config.Load()
-		if err != nil {
-			return fmt.Errorf("failed to load config: %w", err)
+		// If --runtime specified, we can skip config loading for runtime selection
+		// But still need config for credentials
+		var cfg *config.Config
+		var err error
+
+		if runRuntime != "" {
+			// Runtime specified on command line - load config but don't fail if missing runtime
+			cfg, err = config.LoadWithoutRuntimeCheck()
+			if err != nil {
+				// Config doesn't exist - use defaults
+				cfg = &config.Config{
+					ContainerRuntime: runRuntime,
+					DefaultCredentials: config.Credentials{
+						Git: true, // Sensible defaults
+						GH:  true,
+					},
+				}
+			}
+		} else {
+			// No runtime flag - load config (will prompt if runtime not set)
+			cfg, err = config.Load()
+			if err != nil {
+				return fmt.Errorf("failed to load config: %w", err)
+			}
 		}
 
 		// Determine which credentials to use (flags override config)
