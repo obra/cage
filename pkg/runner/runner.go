@@ -274,22 +274,19 @@ func Run(config *RunConfig) error {
 
 	// Mount credentials based on configuration
 	if config.Credentials.Git {
-		// Mount .gitconfig
-		// Note: Apple Container may not support :ro syntax or single file mounts
-		gitconfigPath := filepath.Join(homeDir, ".gitconfig")
-		if fileExists(gitconfigPath) {
-			if isAppleRuntime {
-				// Apple Container: skip single file mounts - copy after container starts
-			} else {
+		if isAppleRuntime {
+			// Apple Container: use built-in --ssh flag for SSH auth socket forwarding
+			// This is better than mounting .ssh - it auto-updates on session restart
+			args = append(args, "--ssh")
+			// .gitconfig will be copied after container starts (no single file mounts)
+		} else {
+			// Docker/Podman: mount .gitconfig and .ssh
+			gitconfigPath := filepath.Join(homeDir, ".gitconfig")
+			if fileExists(gitconfigPath) {
 				args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.gitconfig:ro", gitconfigPath, devConfig.RemoteUser))
 			}
-		}
-		// Mount .ssh directory (read-only for security)
-		sshPath := filepath.Join(homeDir, ".ssh")
-		if fileExists(sshPath) {
-			if isAppleRuntime {
-				args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.ssh", sshPath, devConfig.RemoteUser))
-			} else {
+			sshPath := filepath.Join(homeDir, ".ssh")
+			if fileExists(sshPath) {
 				args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.ssh:ro", sshPath, devConfig.RemoteUser))
 			}
 		}
