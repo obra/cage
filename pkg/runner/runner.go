@@ -148,11 +148,10 @@ func Run(config *RunConfig) error {
 		}
 
 		// Get container ID
-		containerID, err := dockerClient.Run("ps", "--filter", fmt.Sprintf("name=%s", containerName), "--format", "{{.ID}}")
+		containerID, err := getContainerID(dockerClient, containerName)
 		if err != nil {
 			return fmt.Errorf("failed to get container ID: %w", err)
 		}
-		containerID = strings.TrimSpace(containerID)
 
 		// Exec into existing container
 		cmdPath, err := exec.LookPath(dockerClient.Command())
@@ -442,7 +441,43 @@ func containerIsRunning(dockerClient *docker.Client, name string) (bool, error) 
 	if err != nil {
 		return false, err
 	}
+
+	// For Apple Container, output is JSON array - check if container with name exists
+	if strings.HasPrefix(strings.TrimSpace(output), "[") {
+		// JSON output - parse it
+		return strings.Contains(output, fmt.Sprintf(`"name":"%s"`, name)), nil
+	}
+
+	// Docker/Podman - simple name matching
 	return strings.TrimSpace(output) == name, nil
+}
+
+// getContainerID gets the container ID by name
+func getContainerID(dockerClient *docker.Client, name string) (string, error) {
+	output, err := dockerClient.Run("ps", "--filter", fmt.Sprintf("name=%s", name), "--format", "{{.ID}}")
+	if err != nil {
+		return "", err
+	}
+
+	// For Apple Container, output is JSON array - extract ID
+	if strings.HasPrefix(strings.TrimSpace(output), "[") {
+		// JSON output - parse to find ID
+		// Simple parsing: look for "id":"<value>"
+		idPrefix := `"id":"`
+		startIdx := strings.Index(output, idPrefix)
+		if startIdx == -1 {
+			return "", fmt.Errorf("container not found in output")
+		}
+		startIdx += len(idPrefix)
+		endIdx := strings.Index(output[startIdx:], `"`)
+		if endIdx == -1 {
+			return "", fmt.Errorf("malformed JSON")
+		}
+		return output[startIdx : startIdx+endIdx], nil
+	}
+
+	// Docker/Podman - ID in output
+	return strings.TrimSpace(output), nil
 }
 
 func fileExists(path string) bool {
