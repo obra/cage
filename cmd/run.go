@@ -3,6 +3,9 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"syscall"
+	"time"
 
 	"github.com/obra/packnplay/pkg/config"
 	"github.com/obra/packnplay/pkg/runner"
@@ -31,6 +34,11 @@ var runCmd = &cobra.Command{
 	Long:  `Start a container and execute the specified command inside it.`,
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Ensure credential watcher is running (auto-managed daemon)
+		if err := ensureCredentialWatcher(); err != nil {
+			return fmt.Errorf("failed to start credential watcher: %w", err)
+		}
+
 		// If --runtime specified, we can skip config loading for runtime selection
 		// But still need config for credentials
 		var cfg *config.Config
@@ -132,4 +140,38 @@ func init() {
 	runGPGCreds = runCmd.Flags().Bool("gpg-creds", false, "Mount GPG credentials for commit signing")
 	runNPMCreds = runCmd.Flags().Bool("npm-creds", false, "Mount npm credentials")
 	runCmd.Flags().BoolVar(&runAllCreds, "all-creds", false, "Mount all available credentials")
+}
+
+// ensureCredentialWatcher starts the credential sync daemon if not already running
+func ensureCredentialWatcher() error {
+	// Check if watcher is already running
+	if isWatcherRunning() {
+		return nil
+	}
+
+	// Start watcher in background
+	executable, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("failed to get executable path: %w", err)
+	}
+
+	cmd := exec.Command(executable, "watch-credentials")
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setsid: true, // Detach from parent process group
+	}
+
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start watcher: %w", err)
+	}
+
+	// Let it start up
+	time.Sleep(100 * time.Millisecond)
+	return nil
+}
+
+// isWatcherRunning checks if credential watcher daemon is running
+func isWatcherRunning() bool {
+	cmd := exec.Command("pgrep", "-f", "packnplay.*watch-credentials")
+	err := cmd.Run()
+	return err == nil
 }

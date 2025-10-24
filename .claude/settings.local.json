@@ -45,7 +45,9 @@
       "Bash(make build:*)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "Bash(git pull:*)"
+      "Bash(git pull:*)",
+      "Read(//tmp/**)",
+      "Bash(git clone:*)"
     ],
     "deny": [],
     "ask": []

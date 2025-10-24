@@ -193,46 +193,8 @@ func Run(config *RunConfig) error {
 	// Check if we're on Linux (idmap only supported on Linux)
 	isLinux := os.Getenv("OSTYPE") == "linux-gnu" || fileExists("/proc/version")
 
-	// On macOS, extract credentials from Keychain and create temp files
-	var credentialsTempFile string
-	var ghHostsYmlTempFile string
-
-	if !isLinux {
-		// Extract Claude credentials
-		creds, err := getClaudeCredentialsFromKeychain()
-		if err != nil {
-			if config.Verbose {
-				fmt.Fprintf(os.Stderr, "Warning: Could not get Claude credentials from Keychain: %v\n", err)
-			}
-		} else {
-			credentialsTempFile, err = createCredentialsTempFile(creds)
-			if err != nil {
-				return fmt.Errorf("failed to create credentials temp file: %w", err)
-			}
-			defer os.Remove(credentialsTempFile)
-
-			if config.Verbose {
-				fmt.Fprintf(os.Stderr, "Created Claude credentials temp file: %s\n", credentialsTempFile)
-			}
-		}
-
-		// Extract GH credentials if enabled
-		if config.Credentials.GH {
-			ghTempFile, err := createGHHostsYmlFromKeychain(currentUser.HomeDir, config.Verbose)
-			if err != nil {
-				if config.Verbose {
-					fmt.Fprintf(os.Stderr, "Warning: Could not create gh hosts.yml from Keychain: %v\n", err)
-				}
-			} else {
-				ghHostsYmlTempFile = ghTempFile
-				defer os.Remove(ghHostsYmlTempFile)
-
-				if config.Verbose {
-					fmt.Fprintf(os.Stderr, "Created gh hosts.yml temp file: %s\n", ghHostsYmlTempFile)
-				}
-			}
-		}
-	}
+	// Note: Credentials are now managed by separate per-container files and watcher daemon
+	// No need for Keychain extraction during container startup
 
 	// Build docker run command for background container
 	// Apple Container doesn't support -it with -d (detached mode)
@@ -260,8 +222,12 @@ func Run(config *RunConfig) error {
 	// Mount .claude directory
 	args = append(args, "-v", fmt.Sprintf("%s/.claude:/home/%s/.claude", homeDir, devConfig.RemoteUser))
 
-	// Note: Claude credentials from Keychain are copied in after container starts (not mounted)
-	// Apple Container doesn't support single file mounts reliably
+	// Mount separate credential file for container (enables credential sync across containers)
+	credentialFile, err := getOrCreateContainerCredentialFile(containerName)
+	if err != nil {
+		return fmt.Errorf("failed to get credential file: %w", err)
+	}
+	args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.claude/.credentials.json", credentialFile, devConfig.RemoteUser))
 
 	// Mount workspace at /workspace
 	args = append(args, "-v", fmt.Sprintf("%s:/workspace", mountPath))
@@ -381,37 +347,8 @@ func Run(config *RunConfig) error {
 		}
 	}
 
-	// Copy config files for Docker/Podman (Apple Container has no cp command)
-	if !isAppleRuntime {
-		// Copy Claude credentials from Keychain if extracted (macOS only)
-		if !isLinux && credentialsTempFile != "" {
-			if err := copyFileToContainer(dockerClient, containerID, credentialsTempFile, "/tmp/.claude-credentials.json", devConfig.RemoteUser, config.Verbose); err != nil {
-				if config.Verbose {
-					fmt.Fprintf(os.Stderr, "Warning: failed to copy Claude credentials: %v\n", err)
-				}
-			} else {
-				// Create symlink from expected location to /tmp
-				_, err = dockerClient.Run("exec", containerID, "ln", "-sf", "/tmp/.claude-credentials.json", fmt.Sprintf("/home/%s/.claude/.credentials.json", devConfig.RemoteUser))
-				if err != nil && config.Verbose {
-					fmt.Fprintf(os.Stderr, "Warning: failed to create credentials symlink: %v\n", err)
-				}
-			}
-		}
-
-		// Copy gh config directory if credentials enabled and temp file created (macOS Keychain)
-		if config.Credentials.GH && !isLinux && ghHostsYmlTempFile != "" {
-			if err := copyFileToContainer(dockerClient, containerID, ghHostsYmlTempFile, fmt.Sprintf("/home/%s/.config/gh/hosts.yml", devConfig.RemoteUser), devConfig.RemoteUser, config.Verbose); err != nil {
-				if config.Verbose {
-					fmt.Fprintf(os.Stderr, "Warning: failed to copy gh hosts.yml: %v\n", err)
-				}
-			}
-		}
-	} else {
-		// Apple Container: Limited credential support due to no cp command
-		if config.Verbose {
-			fmt.Fprintf(os.Stderr, "Note: Apple Container has limited credential support (no file copying)\n")
-		}
-	}
+	// Note: .credentials.json is now mounted separately per-container
+	// No copying needed - watcher daemon handles sync
 
 	// Step 11: Exec into container with user's command
 	cmdPath, err := exec.LookPath(dockerClient.Command())
@@ -556,6 +493,74 @@ func getContainerID(dockerClient *docker.Client, name string) (string, error) {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+// getOrCreateContainerCredentialFile manages per-container credential files
+func getOrCreateContainerCredentialFile(containerName string) (string, error) {
+	// Get credentials directory
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	xdgDataHome := os.Getenv("XDG_DATA_HOME")
+	if xdgDataHome == "" {
+		xdgDataHome = filepath.Join(homeDir, ".local", "share")
+	}
+
+	credentialsDir := filepath.Join(xdgDataHome, "packnplay", "credentials")
+	if err := os.MkdirAll(credentialsDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create credentials dir: %w", err)
+	}
+
+	// Create container-specific credential file
+	credentialFile := filepath.Join(credentialsDir, fmt.Sprintf("%s.credentials.json", containerName))
+
+	// If file doesn't exist, initialize it
+	if !fileExists(credentialFile) {
+		// Try to get initial credentials from keychain (macOS) or copy from host (Linux)
+		initialCreds, err := getInitialContainerCredentials()
+		if err != nil {
+			// Create empty file - user will need to authenticate in container
+			if err := os.WriteFile(credentialFile, []byte("{}"), 0600); err != nil {
+				return "", fmt.Errorf("failed to create credential file: %w", err)
+			}
+		} else {
+			if err := os.WriteFile(credentialFile, []byte(initialCreds), 0600); err != nil {
+				return "", fmt.Errorf("failed to write initial credentials: %w", err)
+			}
+		}
+	}
+
+	return credentialFile, nil
+}
+
+// getInitialContainerCredentials gets initial credentials for new containers
+func getInitialContainerCredentials() (string, error) {
+	// Check if we're on macOS and can get from keychain
+	if !fileExists("/proc/version") { // macOS detection
+		cmd := exec.Command("security", "find-generic-password",
+			"-s", "packnplay-containers-credentials",
+			"-a", "packnplay",
+			"-w")
+
+		output, err := cmd.Output()
+		if err == nil {
+			return strings.TrimSpace(string(output)), nil
+		}
+	} else {
+		// Linux: Check if host has .credentials.json we can copy
+		homeDir, _ := os.UserHomeDir()
+		hostCredFile := filepath.Join(homeDir, ".claude", ".credentials.json")
+		if fileExists(hostCredFile) {
+			content, err := os.ReadFile(hostCredFile)
+			if err == nil {
+				return string(content), nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("no initial credentials available")
 }
 
 // copyFileToContainer copies a file into container and fixes ownership
