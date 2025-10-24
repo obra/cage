@@ -215,26 +215,34 @@ func Run(config *RunConfig) error {
 	// Note: idmap support is kernel/Docker version dependent, so we don't use it for now
 	// Just use simple volume mounts and run as container's default user
 
-	// Mount .claude directory
-	args = append(args, "-v", fmt.Sprintf("%s/.claude:/home/%s/.claude", homeDir, devConfig.RemoteUser))
-
-	// Only overlay credential file if host doesn't have .credentials.json
+	// Check if we need container-managed credentials
 	hostCredFile := filepath.Join(homeDir, ".claude", ".credentials.json")
+	var needsCredentialOverlay bool
+	var credentialFile string
+
 	if !fileExists(hostCredFile) {
+		needsCredentialOverlay = true
 		if config.Verbose {
 			fmt.Fprintf(os.Stderr, "Host has no .credentials.json, using container-managed credentials\n")
 		}
 
-		// Mount credential file to /tmp and copy to .claude on container start
-		credentialFile, err := getOrCreateContainerCredentialFile(containerName)
+		var err error
+		credentialFile, err = getOrCreateContainerCredentialFile(containerName)
 		if err != nil {
 			return fmt.Errorf("failed to get credential file: %w", err)
 		}
-		args = append(args, "-v", fmt.Sprintf("%s:/tmp/packnplay-credentials.json", credentialFile))
 	} else {
 		if config.Verbose {
 			fmt.Fprintf(os.Stderr, "Using host .credentials.json (no overlay needed)\n")
 		}
+	}
+
+	// Mount .claude directory
+	args = append(args, "-v", fmt.Sprintf("%s/.claude:/home/%s/.claude", homeDir, devConfig.RemoteUser))
+
+	// Overlay mount credential file after .claude directory mount
+	if needsCredentialOverlay {
+		args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.claude/.credentials.json", credentialFile, devConfig.RemoteUser))
 	}
 
 	// Mount workspace at /workspace
