@@ -29,8 +29,7 @@ builds:
       - -X github.com/obra/packnplay/cmd.date={{.Date}}
 
 archives:
-  - format: tar.gz
-    name_template: >-
+  - name_template: >-
       {{ .ProjectName }}_
       {{- .Version }}_
       {{- title .Os }}_
