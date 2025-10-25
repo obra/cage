@@ -1,4 +1,8 @@
 package main
 
-// Version is the current version of packnplay
-const Version = "v1.0.0"
+// Version information set via ldflags during build
+var (
+	version = "dev"
+	commit  = "none"
+	date    = "unknown"
+)
