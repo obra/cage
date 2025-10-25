@@ -21,6 +21,7 @@ var (
 	runVerbose    bool
 	runRuntime    string
 	runConfig     string
+	runReconnect  bool
 	// Credential flags
 	runGitCreds *bool
 	runSSHCreds *bool
@@ -120,6 +121,7 @@ var runCmd = &cobra.Command{
 			Env:            append(runEnv, configEnv...), // Merge user env vars with config env vars
 			Verbose:        runVerbose,
 			Runtime:        runtime,
+			Reconnect:      runReconnect,
 			DefaultImage:   cfg.DefaultImage,
 			DefaultUser:    cfg.DefaultUser,
 			Command:        args,
@@ -149,6 +151,7 @@ func init() {
 	runCmd.Flags().StringSliceVar(&runEnv, "env", []string{}, "Additional env vars (KEY=value)")
 	runCmd.Flags().StringVar(&runRuntime, "runtime", "", "Container runtime to use (docker/podman/container)")
 	runCmd.Flags().StringVar(&runConfig, "config", "", "API config profile (anthropic, z.ai, anthropic-work, claude-personal)")
+	runCmd.Flags().BoolVar(&runReconnect, "reconnect", false, "Reconnect to existing container instead of failing")
 	runCmd.Flags().BoolVar(&runVerbose, "verbose", false, "Show all docker/git commands")
 
 	// Credential flags (use pointers so we can detect if they were explicitly set)
