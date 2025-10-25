@@ -24,3 +24,6 @@ vendor/
 *.swp
 *.swo
 *~
+
+# Git worktrees
+.worktrees/
