@@ -58,7 +58,9 @@
       "Bash(git add:*)",
       "Skill(superpowers:test-driven-development)",
       "Bash(timeout 10s ./packnplay run:*)",
-      "Bash(git describe:*)"
+      "Bash(git describe:*)",
+      "Bash(git commit:*)",
+      "Bash(git tag:*)"
     ],
     "deny": [],
     "ask": []

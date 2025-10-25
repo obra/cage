@@ -324,7 +324,16 @@ To stop the existing container:
 	if config.Credentials.Git {
 		gitconfigPath := filepath.Join(homeDir, ".gitconfig")
 		if fileExists(gitconfigPath) {
-			args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.gitconfig:ro", gitconfigPath, devConfig.RemoteUser))
+			// Resolve symlinks to get the actual file path
+			resolvedPath, err := resolveMountPath(gitconfigPath)
+			if err != nil {
+				if config.Verbose {
+					fmt.Fprintf(os.Stderr, "Warning: failed to resolve .gitconfig symlink: %v\n", err)
+				}
+				// Fall back to original path if symlink resolution fails
+				resolvedPath = gitconfigPath
+			}
+			args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.gitconfig:ro", resolvedPath, devConfig.RemoteUser))
 		}
 	}
 
@@ -357,7 +366,16 @@ To stop the existing container:
 		// Mount .npmrc file
 		npmrcPath := filepath.Join(homeDir, ".npmrc")
 		if fileExists(npmrcPath) {
-			args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.npmrc:ro", npmrcPath, devConfig.RemoteUser))
+			// Resolve symlinks to get the actual file path
+			resolvedPath, err := resolveMountPath(npmrcPath)
+			if err != nil {
+				if config.Verbose {
+					fmt.Fprintf(os.Stderr, "Warning: failed to resolve .npmrc symlink: %v\n", err)
+				}
+				// Fall back to original path if symlink resolution fails
+				resolvedPath = npmrcPath
+			}
+			args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.npmrc:ro", resolvedPath, devConfig.RemoteUser))
 		}
 	}
 
@@ -598,6 +616,16 @@ func getContainerID(dockerClient *docker.Client, name string) (string, error) {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+// resolveMountPath resolves symlinks to get the actual file path for mounting
+func resolveMountPath(path string) (string, error) {
+	// Use filepath.EvalSymlinks to resolve any symlinks
+	resolvedPath, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve symlinks for %s: %w", path, err)
+	}
+	return resolvedPath, nil
 }
 
 func getFileSize(path string) int64 {
