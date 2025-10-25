@@ -1,4 +1,4 @@
-.PHONY: build install test clean docker-build docker-push help
+.PHONY: build install test clean docker-build docker-push lint lint-fix help
 
 # Binary name
 BINARY := packnplay
@@ -29,6 +29,12 @@ test: ## Run tests
 test-coverage: ## Run tests with coverage
 	$(GOTEST) -v -coverprofile=coverage.out ./...
 	$(GOCMD) tool cover -html=coverage.out -o coverage.html
+
+lint: ## Run golangci-lint
+	golangci-lint run
+
+lint-fix: ## Run golangci-lint with auto-fix
+	golangci-lint run --fix
 
 clean: ## Clean build artifacts
 	$(GOCLEAN)

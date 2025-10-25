@@ -2,6 +2,7 @@ package integration
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -161,7 +162,6 @@ func TestAgentMountsDynamicUser(t *testing.T) {
 				ReadOnly      bool
 			}
 
-			type testAgent struct{}
 
 			getMounts := func(hostHomeDir string, containerUser string) []Mount {
 				containerHomeDir := "/root"
@@ -193,6 +193,10 @@ func TestAgentMountsDynamicUser(t *testing.T) {
 
 // Helper function to check if Docker is available for testing
 func isDockerAvailable() bool {
-	// Simple check - this could be made more robust
-	return true // For now, assume available
+	// Skip Docker tests in CI since CI itself runs in Docker
+	if os.Getenv("CI") != "" {
+		return false
+	}
+	cmd := exec.Command("docker", "info")
+	return cmd.Run() == nil
 }

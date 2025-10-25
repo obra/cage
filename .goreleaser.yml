@@ -1,0 +1,100 @@
+# GoReleaser configuration for packnplay
+# See https://goreleaser.com for documentation
+
+version: 2
+
+before:
+  hooks:
+    # Ensure dependencies are up to date
+    - go mod tidy
+    # Run tests before building
+    - go test ./...
+
+builds:
+  - main: ./main.go
+    binary: packnplay
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      # Embed version information
+      - -s -w
+      - -X github.com/obra/packnplay/cmd.version={{.Version}}
+      - -X github.com/obra/packnplay/cmd.commit={{.Commit}}
+      - -X github.com/obra/packnplay/cmd.date={{.Date}}
+
+archives:
+  - name_template: >-
+      {{ .ProjectName }}_
+      {{- .Version }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    files:
+      - README.md
+      - LICENSE*
+      - CHANGELOG.md
+
+checksum:
+  name_template: 'checksums.txt'
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^chore:'
+      - 'merge conflict'
+      - Merge pull request
+      - Merge remote-tracking branch
+      - Merge branch
+  groups:
+    - title: 'New Features'
+      regexp: '^.*?feat(\([[:word:]]+\))??!?:.+$'
+      order: 0
+    - title: 'Bug Fixes'
+      regexp: '^.*?fix(\([[:word:]]+\))??!?:.+$'
+      order: 1
+    - title: 'Performance Improvements'
+      regexp: '^.*?perf(\([[:word:]]+\))??!?:.+$'
+      order: 2
+    - title: 'Refactors'
+      regexp: '^.*?refactor(\([[:word:]]+\))??!?:.+$'
+      order: 3
+    - title: 'Other Changes'
+      order: 999
+
+brews:
+  - name: packnplay
+    repository:
+      owner: obra
+      name: homebrew-tap
+      token: "{{ .Env.GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: https://github.com/obra/packnplay
+    description: "Development container tool with seamless AI coding agent support"
+    license: "MIT"
+    install: |
+      bin.install "packnplay"
+    test: |
+      system "#{bin}/packnplay", "--version"
+
+release:
+  github:
+    owner: obra
+    name: packnplay
+  prerelease: auto
+  draft: false
