@@ -161,7 +161,6 @@ func TestAgentMountsDynamicUser(t *testing.T) {
 				ReadOnly      bool
 			}
 
-			type testAgent struct{}
 
 			getMounts := func(hostHomeDir string, containerUser string) []Mount {
 				containerHomeDir := "/root"

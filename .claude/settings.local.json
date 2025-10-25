@@ -60,7 +60,9 @@
       "Bash(timeout 10s ./packnplay run:*)",
       "Bash(git describe:*)",
       "Bash(git commit:*)",
-      "Bash(git tag:*)"
+      "Bash(git tag:*)",
+      "Bash(git rm:*)",
+      "Bash(make lint:*)"
     ],
     "deny": [],
     "ask": []
