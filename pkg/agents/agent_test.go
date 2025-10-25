@@ -44,8 +44,8 @@ func TestClaudeAgent(t *testing.T) {
 		t.Error("RequiresSpecialHandling() = false, want true for Claude")
 	}
 
-	// Test mounts
-	mounts := agent.GetMounts("/home/test")
+	// Test mounts with default user
+	mounts := agent.GetMounts("/home/test", "vscode")
 	if len(mounts) != 1 {
 		t.Errorf("GetMounts() returned %d mounts, want 1", len(mounts))
 	}
@@ -78,8 +78,8 @@ func TestCodexAgent(t *testing.T) {
 		t.Error("RequiresSpecialHandling() = true, want false for Codex")
 	}
 
-	// Test mounts
-	mounts := agent.GetMounts("/home/test")
+	// Test mounts with default user
+	mounts := agent.GetMounts("/home/test", "vscode")
 	if len(mounts) != 1 {
 		t.Errorf("GetMounts() returned %d mounts, want 1", len(mounts))
 	}
@@ -142,5 +142,43 @@ func TestGetDefaultEnvVars(t *testing.T) {
 	// Should have a reasonable number of env vars (not too few, not too many)
 	if len(envVars) < 6 {
 		t.Errorf("GetDefaultEnvVars() returned only %d vars, expected at least 6", len(envVars))
+	}
+}
+
+func TestClaudeAgentWithCustomUser(t *testing.T) {
+	agent := &ClaudeAgent{}
+
+	// Test that agent can generate mounts for custom container user
+	mounts := agent.GetMounts("/home/test", "customuser")
+	if len(mounts) != 1 {
+		t.Errorf("GetMounts() returned %d mounts, want 1", len(mounts))
+	}
+
+	if mounts[0].HostPath != "/home/test/.claude" {
+		t.Errorf("Mount HostPath = %v, want /home/test/.claude", mounts[0].HostPath)
+	}
+
+	if mounts[0].ContainerPath != "/home/customuser/.claude" {
+		t.Errorf("Mount ContainerPath = %v, want /home/customuser/.claude", mounts[0].ContainerPath)
+	}
+}
+
+func TestCodexAgentWithCustomUser(t *testing.T) {
+	agent := &CodexAgent{}
+
+	// Test that agent can generate mounts for custom container user
+	mounts := agent.GetMounts("/home/test", "myuser")
+	if len(mounts) != 1 {
+		t.Errorf("GetMounts() returned %d mounts, want 1", len(mounts))
+	}
+
+	expected := Mount{
+		HostPath:      "/home/test/.codex",
+		ContainerPath: "/home/myuser/.codex",
+		ReadOnly:      false,
+	}
+
+	if mounts[0] != expected {
+		t.Errorf("GetMounts() = %+v, want %+v", mounts[0], expected)
 	}
 }

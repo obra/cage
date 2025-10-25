@@ -15,6 +15,8 @@ func TestConfig_SaveAndLoad(t *testing.T) {
 	// Test config
 	cfg := &Config{
 		ContainerRuntime: "docker",
+		DefaultImage:     "ghcr.io/obra/packnplay-default:latest",
+		DefaultUser:      "customuser",
 		DefaultCredentials: Credentials{
 			Git: true,
 			SSH: false,
@@ -57,6 +59,14 @@ func TestConfig_SaveAndLoad(t *testing.T) {
 		t.Errorf("ContainerRuntime = %v, want %v", loaded.ContainerRuntime, cfg.ContainerRuntime)
 	}
 
+	if loaded.DefaultImage != cfg.DefaultImage {
+		t.Errorf("DefaultImage = %v, want %v", loaded.DefaultImage, cfg.DefaultImage)
+	}
+
+	if loaded.DefaultUser != cfg.DefaultUser {
+		t.Errorf("DefaultUser = %v, want %v", loaded.DefaultUser, cfg.DefaultUser)
+	}
+
 	if loaded.DefaultCredentials.Git != cfg.DefaultCredentials.Git {
 		t.Errorf("Git credentials = %v, want %v", loaded.DefaultCredentials.Git, cfg.DefaultCredentials.Git)
 	}
@@ -67,6 +77,39 @@ func TestConfig_SaveAndLoad(t *testing.T) {
 
 	if _, exists := loaded.EnvConfigs["z.ai"]; !exists {
 		t.Errorf("z.ai config not found in loaded config")
+	}
+}
+
+func TestConfig_DefaultUserFallback(t *testing.T) {
+	// Use temp directory for test config
+	tempDir := t.TempDir()
+	os.Setenv("XDG_CONFIG_HOME", tempDir)
+	defer os.Unsetenv("XDG_CONFIG_HOME")
+
+	// Config without default_user specified
+	cfg := &Config{
+		ContainerRuntime: "docker",
+		DefaultImage:     "ghcr.io/obra/packnplay-default:latest",
+		// DefaultUser not set
+		DefaultCredentials: Credentials{
+			Git: true,
+		},
+	}
+
+	// Save config
+	if err := Save(cfg); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	// Load config back
+	loaded, err := LoadWithoutRuntimeCheck()
+	if err != nil {
+		t.Fatalf("LoadWithoutRuntimeCheck() error = %v", err)
+	}
+
+	// Should default to "vscode" if not specified
+	if loaded.DefaultUser != "vscode" {
+		t.Errorf("DefaultUser = %v, want vscode (default)", loaded.DefaultUser)
 	}
 }
 

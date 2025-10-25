@@ -125,6 +125,7 @@ Pack 'n Play creates git worktrees in XDG-compliant locations for isolation:
 2. Falls back to `ghcr.io/obra/packnplay-default:latest` if not found
 3. Supports both `image` (pulls) and `dockerFile` (builds) fields
 4. Auto-pulls/builds images as needed
+5. Validates that the configured user exists in the image on startup
 
 **Default container includes:**
 - Node.js v22 LTS
@@ -132,6 +133,29 @@ Pack 'n Play creates git worktrees in XDG-compliant locations for isolation:
 - GitHub CLI (`gh`) and GitHub Copilot CLI (`copilot`)
 - Qwen Code (`qwen`), Cursor CLI (`cursor-agent`), Sourcegraph Amp (`amp`)
 - Git and common development utilities
+- Default user: `vscode` (UID 1000)
+
+### Dev Container Configuration
+
+Projects can customize their dev container by creating `.devcontainer/devcontainer.json`:
+
+```json
+{
+  "image": "ghcr.io/obra/packnplay-default:latest",
+  "remoteUser": "vscode"
+}
+```
+
+**Supported fields:**
+- `image`: Docker image to use (e.g., `"ghcr.io/obra/packnplay-default:latest"`)
+- `dockerFile`: Path to Dockerfile for custom builds (e.g., `"Dockerfile"`)
+- `remoteUser`: Username to use inside the container (default: `"vscode"`)
+
+**User validation:**
+On startup, packnplay validates that the `remoteUser` exists in the image. If the user doesn't exist, you'll get a clear error message with suggestions to fix it:
+1. Use an image that has the required user
+2. Configure a different user in `devcontainer.json`
+3. Build a custom image with the required user
 
 ## Rebuilding the Default Container
 
@@ -193,6 +217,8 @@ On first run, packnplay prompts you to choose which credentials to enable by def
 ```json
 {
   "container_runtime": "docker",
+  "default_image": "ghcr.io/obra/packnplay-default:latest",
+  "default_user": "vscode",
   "default_credentials": {
     "git": true,
     "ssh": true,
@@ -233,6 +259,17 @@ On first run, packnplay prompts you to choose which credentials to enable by def
 ```
 
 Created interactively on first run. Edit manually or delete to reconfigure.
+
+**Configuration fields:**
+- `container_runtime`: Container runtime to use (`"docker"`, `"podman"`, or `"container"`)
+- `default_image`: Default container image when project has no devcontainer.json (default: `"ghcr.io/obra/packnplay-default:latest"`)
+- `default_user`: Default username inside container when project has no devcontainer.json (default: `"vscode"`)
+- `default_credentials`: Which credentials to mount by default
+- `env_configs`: Named environment configurations for different API setups
+
+**Why configure `default_user`?**
+
+If you set a custom `default_image` that uses a different username (like `"developer"`, `"ubuntu"`, or `"node"`), you should also set `default_user` to match. This ensures packnplay uses the correct username for file mounts and validation when projects don't have their own `.devcontainer/devcontainer.json` file.
 
 ### Environment Configurations
 

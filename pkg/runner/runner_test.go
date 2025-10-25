@@ -94,6 +94,8 @@ func TestRunConfig(t *testing.T) {
 		Env:            []string{"TEST=value"},
 		Verbose:        true,
 		Runtime:        "docker",
+		DefaultImage:   "ghcr.io/obra/packnplay-default:latest",
+		DefaultUser:    "vscode",
 		Command:        []string{"claude", "test"},
 		DefaultEnvVars: []string{"ANTHROPIC_API_KEY"},
 		Credentials: config.Credentials{
@@ -113,5 +115,30 @@ func TestRunConfig(t *testing.T) {
 
 	if len(cfg.DefaultEnvVars) != 1 || cfg.DefaultEnvVars[0] != "ANTHROPIC_API_KEY" {
 		t.Errorf("RunConfig.DefaultEnvVars = %v, want [ANTHROPIC_API_KEY]", cfg.DefaultEnvVars)
+	}
+
+	if cfg.DefaultImage != "ghcr.io/obra/packnplay-default:latest" {
+		t.Errorf("RunConfig.DefaultImage = %v, want ghcr.io/obra/packnplay-default:latest", cfg.DefaultImage)
+	}
+
+	if cfg.DefaultUser != "vscode" {
+		t.Errorf("RunConfig.DefaultUser = %v, want vscode", cfg.DefaultUser)
+	}
+}
+
+func TestValidateUserExistsInImage(t *testing.T) {
+	// Test that function exists and has correct signature
+	// This test documents the expected behavior even if we can't fully test without real docker
+
+	// Mock docker client for testing
+	// In real scenario, validateUserExistsInImage would:
+	// 1. Run: docker run --rm <image> id -u <username>
+	// 2. If command succeeds, user exists
+	// 3. If command fails, return error with message about missing user
+
+	// Test with nil client should fail gracefully
+	err := validateUserExistsInImage(nil, "test-image", "testuser", false)
+	if err == nil {
+		t.Error("validateUserExistsInImage with nil client should return error")
 	}
 }

@@ -56,3 +56,38 @@ Or build from this Dockerfile:
   "remoteUser": "vscode"
 }
 ```
+
+### Configuration Fields
+
+**`image`**: Specifies which Docker image to use. Can be any valid Docker image tag.
+
+**`dockerFile`**: Path to a Dockerfile for building a custom image. Use this when you need to install additional tools or customize the environment.
+
+**`remoteUser`**: The username to use inside the container (default: `"vscode"`). This user must exist in the image.
+
+**Important:** packnplay validates on startup that the specified user exists in the image. If you use a custom image or change `remoteUser`, ensure the user is created in your Dockerfile:
+
+```dockerfile
+# Example: Creating a custom user in your Dockerfile
+RUN useradd -m -s /bin/bash -u 1000 myuser
+USER myuser
+```
+
+### Advanced Example
+
+For projects with specific requirements:
+
+```json
+{
+  "dockerFile": "Dockerfile",
+  "remoteUser": "developer",
+  "build": {
+    "args": {
+      "NODE_VERSION": "20",
+      "UID": "1000"
+    }
+  }
+}
+```
+
+Make sure your Dockerfile creates the `developer` user with UID 1000.

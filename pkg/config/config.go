@@ -14,6 +14,7 @@ import (
 type Config struct {
 	ContainerRuntime   string               `json:"container_runtime"` // docker, podman, or container
 	DefaultImage       string               `json:"default_image"`     // default container image to use
+	DefaultUser        string               `json:"default_user"`      // default username inside container
 	DefaultCredentials Credentials          `json:"default_credentials"`
 	DefaultEnvVars     []string             `json:"default_env_vars"` // API keys to always proxy
 	EnvConfigs         map[string]EnvConfig `json:"env_configs"`
@@ -76,6 +77,11 @@ func Load() (*Config, error) {
 		cfg.DefaultImage = "ghcr.io/obra/packnplay-default:latest"
 	}
 
+	// Set default user if not configured (backward compatibility)
+	if cfg.DefaultUser == "" {
+		cfg.DefaultUser = "vscode"
+	}
+
 	return &cfg, nil
 }
 
@@ -102,6 +108,11 @@ func LoadWithoutRuntimeCheck() (*Config, error) {
 	// Set default image if not configured (backward compatibility)
 	if cfg.DefaultImage == "" {
 		cfg.DefaultImage = "ghcr.io/obra/packnplay-default:latest"
+	}
+
+	// Set default user if not configured (backward compatibility)
+	if cfg.DefaultUser == "" {
+		cfg.DefaultUser = "vscode"
 	}
 
 	return &cfg, nil
@@ -209,6 +220,7 @@ func interactiveSetup(configPath string) (*Config, error) {
 	cfg := &Config{
 		ContainerRuntime: selectedRuntime,
 		DefaultImage:     "ghcr.io/obra/packnplay-default:latest",
+		DefaultUser:      "vscode",
 		DefaultCredentials: Credentials{
 			Git: true, // Always copy .gitconfig (it's config, not credentials)
 			SSH: sshCreds,

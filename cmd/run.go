@@ -54,6 +54,7 @@ var runCmd = &cobra.Command{
 				cfg = &config.Config{
 					ContainerRuntime: runRuntime,
 					DefaultImage:     "ghcr.io/obra/packnplay-default:latest",
+					DefaultUser:      "vscode",
 					DefaultCredentials: config.Credentials{
 						Git: true,  // Always copy .gitconfig
 						SSH: false, // SSH keys are credentials - user choice
@@ -120,6 +121,7 @@ var runCmd = &cobra.Command{
 			Verbose:        runVerbose,
 			Runtime:        runtime,
 			DefaultImage:   cfg.DefaultImage,
+			DefaultUser:    cfg.DefaultUser,
 			Command:        args,
 			Credentials:    creds,
 			DefaultEnvVars: cfg.DefaultEnvVars,

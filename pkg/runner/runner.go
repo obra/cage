@@ -24,6 +24,7 @@ type RunConfig struct {
 	Verbose        bool
 	Runtime        string // docker, podman, or container
 	DefaultImage   string // default container image to use
+	DefaultUser    string // default username inside container
 	Command        []string
 	Credentials    config.Credentials
 	DefaultEnvVars []string // API keys to proxy from host
@@ -117,12 +118,12 @@ func Run(config *RunConfig) error {
 	}
 
 	// Step 3: Load devcontainer config
-	devConfig, err := devcontainer.LoadConfig(mountPath)
+	devConfig, err := devcontainer.LoadConfig(mountPath, config.DefaultUser)
 	if err != nil {
 		return fmt.Errorf("failed to load devcontainer config: %w", err)
 	}
 	if devConfig == nil {
-		devConfig = devcontainer.GetDefaultConfig(config.DefaultImage)
+		devConfig = devcontainer.GetDefaultConfig(config.DefaultImage, config.DefaultUser)
 	}
 
 	// Step 4: Initialize container client
@@ -133,6 +134,15 @@ func Run(config *RunConfig) error {
 
 	// Step 5: Ensure image available
 	if err := ensureImage(dockerClient, devConfig, mountPath, config.Verbose); err != nil {
+		return err
+	}
+
+	// Step 5.5: Validate that configured user exists in the image
+	validationImageName := devConfig.Image
+	if devConfig.DockerFile != "" {
+		validationImageName = fmt.Sprintf("packnplay-%s-devcontainer:latest", filepath.Base(workDir))
+	}
+	if err := validateUserExistsInImage(dockerClient, validationImageName, devConfig.RemoteUser, config.Verbose); err != nil {
 		return err
 	}
 
@@ -436,6 +446,30 @@ func Run(config *RunConfig) error {
 
 	// Use syscall.Exec to replace current process
 	return syscall.Exec(cmdPath, execArgs, os.Environ())
+}
+
+// validateUserExistsInImage checks if the specified user exists in the container image
+func validateUserExistsInImage(dockerClient *docker.Client, imageName string, username string, verbose bool) error {
+	if dockerClient == nil {
+		return fmt.Errorf("docker client is nil")
+	}
+
+	if verbose {
+		fmt.Fprintf(os.Stderr, "Validating that user '%s' exists in image %s\n", username, imageName)
+	}
+
+	// Try to run 'id -u <username>' in the image
+	// If user exists, command succeeds; if not, it fails
+	output, err := dockerClient.Run("run", "--rm", "--entrypoint", "id", imageName, "-u", username)
+	if err != nil {
+		return fmt.Errorf("user '%s' does not exist in image %s\nTo fix this, either:\n  1. Use an image that has the '%s' user\n  2. Set 'default_user' in ~/.config/packnplay/config.json to match your image's username\n  3. Configure 'remoteUser' in your project's .devcontainer/devcontainer.json\n  4. Build a custom image with the required user\n\nDocker output: %s", username, imageName, username, output)
+	}
+
+	if verbose {
+		fmt.Fprintf(os.Stderr, "User '%s' validated successfully (uid: %s)\n", username, strings.TrimSpace(output))
+	}
+
+	return nil
 }
 
 func ensureImage(dockerClient *docker.Client, config *devcontainer.Config, projectPath string, verbose bool) error {

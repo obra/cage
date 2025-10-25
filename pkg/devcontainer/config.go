@@ -14,7 +14,8 @@ type Config struct {
 }
 
 // LoadConfig loads and parses .devcontainer/devcontainer.json if it exists
-func LoadConfig(projectPath string) (*Config, error) {
+// If the config exists but doesn't specify remoteUser, uses defaultUser parameter
+func LoadConfig(projectPath string, defaultUser string) (*Config, error) {
 	configPath := filepath.Join(projectPath, ".devcontainer", "devcontainer.json")
 
 	// Check if file exists
@@ -34,7 +35,10 @@ func LoadConfig(projectPath string) (*Config, error) {
 
 	// Set default remote user if not specified
 	if config.RemoteUser == "" {
-		config.RemoteUser = "devuser"
+		if defaultUser == "" {
+			defaultUser = "vscode"
+		}
+		config.RemoteUser = defaultUser
 	}
 
 	return &config, nil
@@ -42,12 +46,16 @@ func LoadConfig(projectPath string) (*Config, error) {
 
 // GetDefaultConfig returns the default devcontainer config
 // If defaultImage is empty, uses "ghcr.io/obra/packnplay-default:latest"
-func GetDefaultConfig(defaultImage string) *Config {
+// If defaultUser is empty, uses "vscode"
+func GetDefaultConfig(defaultImage string, defaultUser string) *Config {
 	if defaultImage == "" {
 		defaultImage = "ghcr.io/obra/packnplay-default:latest"
 	}
+	if defaultUser == "" {
+		defaultUser = "vscode"
+	}
 	return &Config{
 		Image:      defaultImage,
-		RemoteUser: "vscode",
+		RemoteUser: defaultUser,
 	}
 }

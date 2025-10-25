@@ -10,7 +10,7 @@ type Agent interface {
 	ConfigDir() string           // e.g., ".claude", ".codex", ".gemini"
 	DefaultAPIKeyEnv() string    // e.g., "ANTHROPIC_API_KEY", "OPENAI_API_KEY"
 	RequiresSpecialHandling() bool // Claude needs credential overlay, others don't
-	GetMounts(homeDir string) []Mount
+	GetMounts(homeDir string, containerUser string) []Mount
 }
 
 // Mount represents a directory or file mount
@@ -42,11 +42,11 @@ func (c *ClaudeAgent) ConfigDir() string           { return ".claude" }
 func (c *ClaudeAgent) DefaultAPIKeyEnv() string    { return "ANTHROPIC_API_KEY" }
 func (c *ClaudeAgent) RequiresSpecialHandling() bool { return true } // Needs credential overlay
 
-func (c *ClaudeAgent) GetMounts(homeDir string) []Mount {
+func (c *ClaudeAgent) GetMounts(homeDir string, containerUser string) []Mount {
 	return []Mount{
 		{
 			HostPath:      filepath.Join(homeDir, ".claude"),
-			ContainerPath: "/home/vscode/.claude",
+			ContainerPath: filepath.Join("/home", containerUser, ".claude"),
 			ReadOnly:      false, // Needs write for plugins, etc.
 		},
 	}
@@ -60,11 +60,11 @@ func (c *CodexAgent) ConfigDir() string           { return ".codex" }
 func (c *CodexAgent) DefaultAPIKeyEnv() string    { return "OPENAI_API_KEY" }
 func (c *CodexAgent) RequiresSpecialHandling() bool { return false } // Simple config mount
 
-func (c *CodexAgent) GetMounts(homeDir string) []Mount {
+func (c *CodexAgent) GetMounts(homeDir string, containerUser string) []Mount {
 	return []Mount{
 		{
 			HostPath:      filepath.Join(homeDir, ".codex"),
-			ContainerPath: "/home/vscode/.codex",
+			ContainerPath: filepath.Join("/home", containerUser, ".codex"),
 			ReadOnly:      false,
 		},
 	}
@@ -78,11 +78,11 @@ func (g *GeminiAgent) ConfigDir() string           { return ".gemini" }
 func (g *GeminiAgent) DefaultAPIKeyEnv() string    { return "GEMINI_API_KEY" }
 func (g *GeminiAgent) RequiresSpecialHandling() bool { return false } // Simple config mount
 
-func (g *GeminiAgent) GetMounts(homeDir string) []Mount {
+func (g *GeminiAgent) GetMounts(homeDir string, containerUser string) []Mount {
 	return []Mount{
 		{
 			HostPath:      filepath.Join(homeDir, ".gemini"),
-			ContainerPath: "/home/vscode/.gemini",
+			ContainerPath: filepath.Join("/home", containerUser, ".gemini"),
 			ReadOnly:      false,
 		},
 	}
@@ -96,11 +96,11 @@ func (c *CopilotAgent) ConfigDir() string           { return ".copilot" }
 func (c *CopilotAgent) DefaultAPIKeyEnv() string    { return "GH_TOKEN" } // Uses GitHub auth
 func (c *CopilotAgent) RequiresSpecialHandling() bool { return false }
 
-func (c *CopilotAgent) GetMounts(homeDir string) []Mount {
+func (c *CopilotAgent) GetMounts(homeDir string, containerUser string) []Mount {
 	return []Mount{
 		{
 			HostPath:      filepath.Join(homeDir, ".copilot"),
-			ContainerPath: "/home/vscode/.copilot",
+			ContainerPath: filepath.Join("/home", containerUser, ".copilot"),
 			ReadOnly:      false,
 		},
 	}
@@ -114,11 +114,11 @@ func (q *QwenAgent) ConfigDir() string           { return ".qwen" }
 func (q *QwenAgent) DefaultAPIKeyEnv() string    { return "QWEN_API_KEY" }
 func (q *QwenAgent) RequiresSpecialHandling() bool { return false }
 
-func (q *QwenAgent) GetMounts(homeDir string) []Mount {
+func (q *QwenAgent) GetMounts(homeDir string, containerUser string) []Mount {
 	return []Mount{
 		{
 			HostPath:      filepath.Join(homeDir, ".qwen"),
-			ContainerPath: "/home/vscode/.qwen",
+			ContainerPath: filepath.Join("/home", containerUser, ".qwen"),
 			ReadOnly:      false,
 		},
 	}
@@ -132,11 +132,11 @@ func (c *CursorAgent) ConfigDir() string           { return ".cursor" }
 func (c *CursorAgent) DefaultAPIKeyEnv() string    { return "CURSOR_API_KEY" } // Assuming based on pattern
 func (c *CursorAgent) RequiresSpecialHandling() bool { return false }
 
-func (c *CursorAgent) GetMounts(homeDir string) []Mount {
+func (c *CursorAgent) GetMounts(homeDir string, containerUser string) []Mount {
 	return []Mount{
 		{
 			HostPath:      filepath.Join(homeDir, ".cursor"),
-			ContainerPath: "/home/vscode/.cursor",
+			ContainerPath: filepath.Join("/home", containerUser, ".cursor"),
 			ReadOnly:      false,
 		},
 	}
@@ -150,11 +150,11 @@ func (a *AmpAgent) ConfigDir() string           { return ".config/amp" } // Uses
 func (a *AmpAgent) DefaultAPIKeyEnv() string    { return "AMP_API_KEY" }
 func (a *AmpAgent) RequiresSpecialHandling() bool { return false }
 
-func (a *AmpAgent) GetMounts(homeDir string) []Mount {
+func (a *AmpAgent) GetMounts(homeDir string, containerUser string) []Mount {
 	return []Mount{
 		{
 			HostPath:      filepath.Join(homeDir, ".config", "amp"),
-			ContainerPath: "/home/vscode/.config/amp",
+			ContainerPath: filepath.Join("/home", containerUser, ".config/amp"),
 			ReadOnly:      false,
 		},
 	}
@@ -168,11 +168,11 @@ func (d *DeepSeekAgent) ConfigDir() string           { return ".deepseek" }
 func (d *DeepSeekAgent) DefaultAPIKeyEnv() string    { return "DEEPSEEK_API_KEY" }
 func (d *DeepSeekAgent) RequiresSpecialHandling() bool { return false }
 
-func (d *DeepSeekAgent) GetMounts(homeDir string) []Mount {
+func (d *DeepSeekAgent) GetMounts(homeDir string, containerUser string) []Mount {
 	return []Mount{
 		{
 			HostPath:      filepath.Join(homeDir, ".deepseek"),
-			ContainerPath: "/home/vscode/.deepseek",
+			ContainerPath: filepath.Join("/home", containerUser, ".deepseek"),
 			ReadOnly:      false,
 		},
 	}
