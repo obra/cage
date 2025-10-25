@@ -261,6 +261,10 @@ func TestGetImageID(t *testing.T) {
 
 // Helper function to check if Docker is available for testing
 func isDockerAvailable() bool {
+	// Skip Docker tests in CI since CI itself runs in Docker
+	if os.Getenv("CI") != "" {
+		return false
+	}
 	cmd := exec.Command("docker", "info")
 	return cmd.Run() == nil
 }
