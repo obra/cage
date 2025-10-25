@@ -2,13 +2,13 @@
 
 ![packnplay hero image](docs/hero.jpeg)
 
-> **⚠️ WARNING: This code is untested and experimental. Use at your own risk. It has not been validated in production environments.**
-
 packnplay launches commands (like Claude Code, Codex, Gemini) inside isolated Docker containers with automated worktree and dev container management.
 
 ## Features
 
 - **Sandboxed Execution**: Run AI coding assistants in isolated Docker containers
+- **Smart User Detection**: Automatically detects and uses the correct container user with intelligent caching
+- **Docker-Compatible Port Mapping**: Expose container ports to host with familiar `-p` syntax
 - **Automatic Worktree Management**: Creates git worktrees in XDG-compliant locations (`~/.local/share/packnplay/worktrees`)
 - **Dev Container Support**: Uses project's `.devcontainer/devcontainer.json` or feature-rich default with AI CLIs pre-installed
 - **Credential Management**: Interactive first-run setup for git, GitHub CLI, GPG, and npm credentials
@@ -41,6 +41,12 @@ packnplay run --worktree=feature-auth claude
 
 # Run with all credentials enabled
 packnplay run --all-creds claude
+
+# Run with port mapping (expose container port 3000 to host port 8080)
+packnplay run -p 8080:3000 npm start
+
+# Multiple port mappings
+packnplay run -p 8080:3000 -p 9000:9001 npm dev
 
 # List running containers
 packnplay list
@@ -93,6 +99,27 @@ packnplay run --npm-creds claude           # Mount npm credentials
 packnplay run --all-creds claude           # Mount all available credentials
 ```
 
+### Port Mapping
+
+Expose container ports to host using Docker-compatible syntax:
+
+```bash
+# Basic port mapping (host:container)
+packnplay run -p 8080:3000 npm start
+
+# Bind to specific host IP
+packnplay run -p 127.0.0.1:8080:3000 npm dev
+
+# Multiple ports
+packnplay run -p 8080:3000 -p 9000:9001 -p 5432:5432 npm dev
+
+# Specify protocol (TCP is default)
+packnplay run -p 8080:3000/tcp -p 5353:53/udp npm start
+
+# Same port on both sides
+packnplay run -p 3000:3000 npm start
+```
+
 ### Environment Variables
 
 ```bash
@@ -107,6 +134,22 @@ packnplay run --env DEBUG=1 --env EDITOR bash
 ```
 
 ## How It Works
+
+### Smart User Detection
+
+packnplay automatically detects the correct user for any Docker image:
+
+**Detection Priority:**
+1. **devcontainer.json**: Respects `remoteUser` field if specified
+2. **Cached Results**: Fast lookup by Docker image ID (no repeated detection)
+3. **Runtime Detection**: Asks container directly: `whoami && echo $HOME`
+4. **Safe Fallback**: Uses `root` if detection fails
+
+**Benefits:**
+- **Universal compatibility**: Works with node, ubuntu, python, custom images
+- **Performance optimized**: Caches results to avoid repeated container starts
+- **No guessing**: Direct container interrogation eliminates assumptions
+- **Standards compliant**: Honors devcontainer.json when present
 
 ### Worktree Management
 

@@ -57,7 +57,8 @@
       "Bash(docker image inspect:*)",
       "Bash(git add:*)",
       "Skill(superpowers:test-driven-development)",
-      "Bash(timeout 10s ./packnplay run:*)"
+      "Bash(timeout 10s ./packnplay run:*)",
+      "Bash(git describe:*)"
     ],
     "deny": [],
     "ask": []
