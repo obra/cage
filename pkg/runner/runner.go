@@ -28,6 +28,7 @@ type RunConfig struct {
 	Command        []string
 	Credentials    config.Credentials
 	DefaultEnvVars []string // API keys to proxy from host
+	PublishPorts   []string // Port mappings to publish to host
 }
 
 func Run(config *RunConfig) error {
@@ -401,6 +402,11 @@ To stop the existing container:
 				args = append(args, "-e", fmt.Sprintf("%s=%s", env, value))
 			}
 		}
+	}
+
+	// Add port mappings
+	for _, port := range config.PublishPorts {
+		args = append(args, "-p", port)
 	}
 
 	// Add image

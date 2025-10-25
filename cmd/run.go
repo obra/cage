@@ -14,14 +14,15 @@ import (
 )
 
 var (
-	runPath       string
-	runWorktree   string
-	runNoWorktree bool
-	runEnv        []string
-	runVerbose    bool
-	runRuntime    string
-	runConfig     string
-	runReconnect  bool
+	runPath         string
+	runWorktree     string
+	runNoWorktree   bool
+	runEnv          []string
+	runVerbose      bool
+	runRuntime      string
+	runConfig       string
+	runReconnect    bool
+	runPublishPorts []string
 	// Credential flags
 	runGitCreds *bool
 	runSSHCreds *bool
@@ -125,6 +126,7 @@ var runCmd = &cobra.Command{
 			Command:        args,
 			Credentials:    creds,
 			DefaultEnvVars: cfg.DefaultEnvVars,
+			PublishPorts:   runPublishPorts,
 		}
 
 		if err := runner.Run(runConfig); err != nil {
@@ -147,6 +149,7 @@ func init() {
 	runCmd.Flags().StringVar(&runWorktree, "worktree", "", "Worktree name (creates if needed)")
 	runCmd.Flags().BoolVar(&runNoWorktree, "no-worktree", false, "Skip worktree, use directory directly")
 	runCmd.Flags().StringSliceVar(&runEnv, "env", []string{}, "Additional env vars (KEY=value)")
+	runCmd.Flags().StringArrayVarP(&runPublishPorts, "publish", "p", []string{}, "Publish container port(s) to host (format: [hostIP:]hostPort:containerPort[/protocol])")
 	runCmd.Flags().StringVar(&runRuntime, "runtime", "", "Container runtime to use (docker/podman/container)")
 	runCmd.Flags().StringVar(&runConfig, "config", "", "API config profile (anthropic, z.ai, anthropic-work, claude-personal)")
 	runCmd.Flags().BoolVar(&runReconnect, "reconnect", false, "Reconnect to existing container instead of failing")
