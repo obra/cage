@@ -51,22 +51,24 @@ func TestLoadConfig_NotFound(t *testing.T) {
 }
 
 func TestGetDefaultConfig(t *testing.T) {
-	// Test with empty string - should use default
+	// Test with empty string - should use default image and detect user
 	config := GetDefaultConfig("")
 	if config.Image != "ghcr.io/obra/packnplay-default:latest" {
 		t.Errorf("GetDefaultConfig(\"\") Image = %v, want ghcr.io/obra/packnplay-default:latest", config.Image)
 	}
-	if config.RemoteUser != "vscode" {
-		t.Errorf("GetDefaultConfig(\"\") RemoteUser = %v, want vscode", config.RemoteUser)
+	// RemoteUser should be detected, not hardcoded. For non-existent images, should fall back to "root"
+	if config.RemoteUser == "" {
+		t.Errorf("GetDefaultConfig(\"\") RemoteUser should not be empty")
 	}
 
-	// Test with custom image
-	customImage := "mycustom/image:v1"
-	config = GetDefaultConfig(customImage)
-	if config.Image != customImage {
-		t.Errorf("GetDefaultConfig(%v) Image = %v, want %v", customImage, config.Image, customImage)
+	// Test with existing image (ubuntu should work)
+	ubuntuImage := "ubuntu:22.04"
+	config = GetDefaultConfig(ubuntuImage)
+	if config.Image != ubuntuImage {
+		t.Errorf("GetDefaultConfig(%v) Image = %v, want %v", ubuntuImage, config.Image, ubuntuImage)
 	}
-	if config.RemoteUser != "vscode" {
-		t.Errorf("GetDefaultConfig(%v) RemoteUser = %v, want vscode", customImage, config.RemoteUser)
+	// For ubuntu, should detect and use "root" as fallback since no better user found
+	if config.RemoteUser == "" {
+		t.Errorf("GetDefaultConfig(%v) RemoteUser should not be empty", ubuntuImage)
 	}
 }

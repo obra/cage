@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+
+	"github.com/obra/packnplay/pkg/userdetect"
 )
 
 // Config represents a parsed devcontainer.json
@@ -32,9 +34,15 @@ func LoadConfig(projectPath string) (*Config, error) {
 		return nil, err
 	}
 
-	// Set default remote user if not specified
-	if config.RemoteUser == "" {
-		config.RemoteUser = "devuser"
+	// If RemoteUser is not specified, detect the best user for the image
+	if config.RemoteUser == "" && config.Image != "" {
+		userResult, err := userdetect.DetectContainerUser(config.Image, nil)
+		if err != nil {
+			// If detection fails, fall back to a safe default
+			config.RemoteUser = "root"
+		} else {
+			config.RemoteUser = userResult.User
+		}
 	}
 
 	return &config, nil
@@ -46,8 +54,16 @@ func GetDefaultConfig(defaultImage string) *Config {
 	if defaultImage == "" {
 		defaultImage = "ghcr.io/obra/packnplay-default:latest"
 	}
+
+	// Detect the best user for this image
+	userResult, err := userdetect.DetectContainerUser(defaultImage, nil)
+	remoteUser := "root" // safe fallback
+	if err == nil {
+		remoteUser = userResult.User
+	}
+
 	return &Config{
 		Image:      defaultImage,
-		RemoteUser: "vscode",
+		RemoteUser: remoteUser,
 	}
 }

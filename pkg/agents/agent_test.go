@@ -44,8 +44,8 @@ func TestClaudeAgent(t *testing.T) {
 		t.Error("RequiresSpecialHandling() = false, want true for Claude")
 	}
 
-	// Test mounts
-	mounts := agent.GetMounts("/home/test")
+	// Test mounts with vscode user
+	mounts := agent.GetMounts("/home/test", "vscode")
 	if len(mounts) != 1 {
 		t.Errorf("GetMounts() returned %d mounts, want 1", len(mounts))
 	}
@@ -56,6 +56,12 @@ func TestClaudeAgent(t *testing.T) {
 
 	if mounts[0].ContainerPath != "/home/vscode/.claude" {
 		t.Errorf("Mount ContainerPath = %v, want /home/vscode/.claude", mounts[0].ContainerPath)
+	}
+
+	// Test mounts with root user
+	rootMounts := agent.GetMounts("/home/test", "root")
+	if rootMounts[0].ContainerPath != "/root/.claude" {
+		t.Errorf("Mount ContainerPath for root = %v, want /root/.claude", rootMounts[0].ContainerPath)
 	}
 }
 
@@ -78,8 +84,8 @@ func TestCodexAgent(t *testing.T) {
 		t.Error("RequiresSpecialHandling() = true, want false for Codex")
 	}
 
-	// Test mounts
-	mounts := agent.GetMounts("/home/test")
+	// Test mounts with vscode user
+	mounts := agent.GetMounts("/home/test", "vscode")
 	if len(mounts) != 1 {
 		t.Errorf("GetMounts() returned %d mounts, want 1", len(mounts))
 	}
@@ -92,6 +98,18 @@ func TestCodexAgent(t *testing.T) {
 
 	if mounts[0] != expected {
 		t.Errorf("GetMounts() = %+v, want %+v", mounts[0], expected)
+	}
+
+	// Test with different user
+	nodeMounts := agent.GetMounts("/home/test", "node")
+	expectedNode := Mount{
+		HostPath:      "/home/test/.codex",
+		ContainerPath: "/home/node/.codex",
+		ReadOnly:      false,
+	}
+
+	if nodeMounts[0] != expectedNode {
+		t.Errorf("GetMounts() with node user = %+v, want %+v", nodeMounts[0], expectedNode)
 	}
 }
 
