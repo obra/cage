@@ -2,6 +2,7 @@ package userdetect
 
 import (
 	"os"
+	"os/exec"
 	"strings"
 	"testing"
 )
