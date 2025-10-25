@@ -2,6 +2,7 @@ package integration
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 
@@ -192,6 +193,6 @@ func TestAgentMountsDynamicUser(t *testing.T) {
 
 // Helper function to check if Docker is available for testing
 func isDockerAvailable() bool {
-	// Simple check - this could be made more robust
-	return true // For now, assume available
+	cmd := exec.Command("docker", "info")
+	return cmd.Run() == nil
 }
