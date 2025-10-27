@@ -356,6 +356,7 @@ packnplay stop --all
 
 ## Credits
 
+- The core ergonomics of the packnplay tool were heavily inspired by [StrongDM Leash](https://github.com/strongdm/leash), which has actual authorization and visibility features that make your use of agents safer, rather than just being wrapper around `docker` commandline invocations like this tool.
 - Hero image contributed by [Dan Shapiro](https://github.com/danshapiro)
 
 ## License
