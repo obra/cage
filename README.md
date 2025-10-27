@@ -1,8 +1,16 @@
-# packnplay
 
 ![packnplay hero image](docs/hero.jpeg)
 
 packnplay launches commands (like Claude Code, Codex, Gemini) inside isolated Docker containers with automated worktree and dev container management.
+
+
+# packnplay
+
+packnplay is a containerization wrapper for your coding agents. It doesn't provide any level of intpospection or access control, other than running your agents in their own containers.
+
+# Leash
+
+[Leash by StrongDM](https://github.com/strongdm/leash) provides *comprehensive* access control and introspection for your coding agents activities. It also provides tools to sandbox your coding agents on macOS *without* containerization.  You probably want to use Leash.
 
 ## Features
 
