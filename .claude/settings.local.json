@@ -62,7 +62,8 @@
       "Bash(git commit:*)",
       "Bash(git tag:*)",
       "Bash(git rm:*)",
-      "Bash(make lint:*)"
+      "Bash(make lint:*)",
+      "Bash(xargs curl -s)"
     ],
     "deny": [],
     "ask": []
