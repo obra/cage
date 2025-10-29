@@ -44,7 +44,7 @@ go install github.com/obra/packnplay@latest
 
 ## Quick Start
 
-On first run, packnplay will prompt you to configure which credentials to mount (git, GitHub CLI, GPG, npm). Your choices are saved to `~/.config/packnplay/config.json`.
+On first run, packnplay will prompt you to configure which credentials to mount (git, GitHub CLI, GPG, npm, AWS). Your choices are saved to `~/.config/packnplay/config.json`.
 
 ```bash
 # Run Claude Code in a sandboxed container (creates worktree automatically)

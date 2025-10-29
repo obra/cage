@@ -67,6 +67,10 @@ func TestConfig_SaveAndLoad(t *testing.T) {
 		t.Errorf("Git credentials = %v, want %v", loaded.DefaultCredentials.Git, cfg.DefaultCredentials.Git)
 	}
 
+	if loaded.DefaultCredentials.GH != cfg.DefaultCredentials.GH {
+		t.Errorf("GH credentials = %v, want %v", loaded.DefaultCredentials.GH, cfg.DefaultCredentials.GH)
+	}
+
 	if len(loaded.DefaultEnvVars) != len(cfg.DefaultEnvVars) {
 		t.Errorf("DefaultEnvVars length = %v, want %v", len(loaded.DefaultEnvVars), len(cfg.DefaultEnvVars))
 	}
@@ -138,6 +142,63 @@ func TestDetectAvailableRuntimes(t *testing.T) {
 		if !validRuntimes[runtime] {
 			t.Errorf("detectAvailableRuntimes() returned invalid runtime: %s", runtime)
 		}
+	}
+}
+
+func TestConfig_AWSCredentials(t *testing.T) {
+	// Use temp directory for test config
+	tempDir := t.TempDir()
+	if err := os.Setenv("XDG_CONFIG_HOME", tempDir); err != nil {
+		t.Fatalf("Failed to set XDG_CONFIG_HOME: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("XDG_CONFIG_HOME"); err != nil {
+			t.Errorf("Failed to unset XDG_CONFIG_HOME: %v", err)
+		}
+	}()
+
+	// Test config with AWS enabled
+	cfg := &Config{
+		ContainerRuntime: "docker",
+		DefaultCredentials: Credentials{
+			Git: true,
+			SSH: true,
+			GH:  true,
+			GPG: true,
+			NPM: true,
+			AWS: true, // Enable AWS credentials
+		},
+	}
+
+	// Save config
+	if err := Save(cfg); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	// Load config back
+	loaded, err := LoadWithoutRuntimeCheck()
+	if err != nil {
+		t.Fatalf("LoadWithoutRuntimeCheck() error = %v", err)
+	}
+
+	// Verify AWS credentials are preserved
+	if loaded.DefaultCredentials.AWS != cfg.DefaultCredentials.AWS {
+		t.Errorf("AWS credentials = %v, want %v", loaded.DefaultCredentials.AWS, cfg.DefaultCredentials.AWS)
+	}
+
+	// Test with AWS disabled
+	cfg.DefaultCredentials.AWS = false
+	if err := Save(cfg); err != nil {
+		t.Fatalf("Save() error = %v", err)
+	}
+
+	loaded, err = LoadWithoutRuntimeCheck()
+	if err != nil {
+		t.Fatalf("LoadWithoutRuntimeCheck() error = %v", err)
+	}
+
+	if loaded.DefaultCredentials.AWS != false {
+		t.Errorf("AWS credentials = %v, want false", loaded.DefaultCredentials.AWS)
 	}
 }
 
