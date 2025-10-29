@@ -33,6 +33,7 @@ type Credentials struct {
 	GH  bool `json:"gh"`  // GitHub CLI credentials
 	GPG bool `json:"gpg"` // GPG keys for commit signing
 	NPM bool `json:"npm"` // npm credentials
+	AWS bool `json:"aws"` // AWS credentials
 }
 
 // GetConfigPath returns the path to the config file
