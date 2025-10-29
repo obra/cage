@@ -9,8 +9,14 @@ import (
 func TestConfig_SaveAndLoad(t *testing.T) {
 	// Use temp directory for test config
 	tempDir := t.TempDir()
-	os.Setenv("XDG_CONFIG_HOME", tempDir)
-	defer os.Unsetenv("XDG_CONFIG_HOME")
+	if err := os.Setenv("XDG_CONFIG_HOME", tempDir); err != nil {
+		t.Fatalf("Failed to set XDG_CONFIG_HOME: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("XDG_CONFIG_HOME"); err != nil {
+			t.Errorf("Failed to unset XDG_CONFIG_HOME: %v", err)
+		}
+	}()
 
 	// Test config
 	cfg := &Config{
@@ -91,8 +97,14 @@ func TestGetConfigPath(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.xdgConfigHome != "" {
-				os.Setenv("XDG_CONFIG_HOME", tt.xdgConfigHome)
-				defer os.Unsetenv("XDG_CONFIG_HOME")
+				if err := os.Setenv("XDG_CONFIG_HOME", tt.xdgConfigHome); err != nil {
+					t.Fatalf("Failed to set XDG_CONFIG_HOME: %v", err)
+				}
+				defer func() {
+					if err := os.Unsetenv("XDG_CONFIG_HOME"); err != nil {
+						t.Errorf("Failed to unset XDG_CONFIG_HOME: %v", err)
+					}
+				}()
 			}
 
 			path := GetConfigPath()

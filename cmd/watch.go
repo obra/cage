@@ -50,7 +50,7 @@ func runCredentialWatcher() error {
 	if err != nil {
 		return fmt.Errorf("failed to create watcher: %w", err)
 	}
-	defer watcher.Close()
+	defer func() { _ = watcher.Close() }()
 	w.watcher = watcher
 
 	// Watch the credentials directory

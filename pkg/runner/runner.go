@@ -390,7 +390,6 @@ To stop the existing container:
 
 		// Priority 1: Check if static credentials are already set in environment
 		if aws.HasStaticCredentials() {
-			awsCredSource = "environment"
 			if config.Verbose {
 				fmt.Fprintf(os.Stderr, "Using existing AWS credentials from environment variables\n")
 			}
@@ -443,7 +442,6 @@ To stop the existing container:
 					awsCredentials[key] = value
 				}
 				if len(awsCredentials) > 0 {
-					awsCredSource = "environment"
 					if config.Verbose {
 						fmt.Fprintf(os.Stderr, "Using AWS environment variables from host\n")
 					}
@@ -865,7 +863,7 @@ func copyFileViaExec(dockerClient *docker.Client, containerID, srcPath, dstPath,
 	if err != nil {
 		return fmt.Errorf("failed to create temp dir: %w", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Copy file to temp directory
 	tempFileName := filepath.Base(srcPath)

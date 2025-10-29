@@ -44,7 +44,7 @@ var listCmd = &cobra.Command{
 
 		// Parse JSON output
 		w := tabwriter.NewWriter(os.Stdout, 0, 0, 3, ' ', 0)
-		fmt.Fprintln(w, "CONTAINER\tSTATUS\tPROJECT\tWORKTREE")
+		_, _ = fmt.Fprintln(w, "CONTAINER\tSTATUS\tPROJECT\tWORKTREE")
 
 		// Docker outputs one JSON object per line
 		lines := splitLines(output)
@@ -62,7 +62,7 @@ var listCmd = &cobra.Command{
 			// Parse labels to extract project and worktree
 			project, worktree := parseLabels(info.Labels)
 
-			fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
+			_, _ = fmt.Fprintf(w, "%s\t%s\t%s\t%s\n",
 				info.Names,
 				info.Status,
 				project,
@@ -70,8 +70,7 @@ var listCmd = &cobra.Command{
 			)
 		}
 
-		w.Flush()
-		return nil
+		return w.Flush()
 	},
 }
 
@@ -96,9 +95,10 @@ func parseLabels(labels string) (project, worktree string) {
 	for _, pair := range pairs {
 		kv := splitByEquals(pair)
 		if len(kv) == 2 {
-			if kv[0] == "packnplay-project" {
+			switch kv[0] {
+			case "packnplay-project":
 				project = kv[1]
-			} else if kv[0] == "packnplay-worktree" {
+			case "packnplay-worktree":
 				worktree = kv[1]
 			}
 		}

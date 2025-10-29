@@ -207,7 +207,7 @@ func TestCaching(t *testing.T) {
 	// Delete cache file if it exists
 	cacheFilePath, err := getCacheFilePath(imageID)
 	if err == nil {
-		os.Remove(cacheFilePath) // Ignore errors
+		_ = os.Remove(cacheFilePath) // Ignore errors
 	}
 
 	// First detection should hit the container

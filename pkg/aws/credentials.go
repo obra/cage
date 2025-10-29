@@ -80,7 +80,7 @@ func ParseAWSConfig(profile string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("failed to open AWS config at %s: %w", configPath, err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	scanner := bufio.NewScanner(file)
 	var currentProfile string

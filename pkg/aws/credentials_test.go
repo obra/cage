@@ -102,8 +102,14 @@ credential_process = my-command ; this is a comment`,
 
 			// Set AWS_CONFIG_FILE to our temp file
 			oldConfigFile := os.Getenv("AWS_CONFIG_FILE")
-			os.Setenv("AWS_CONFIG_FILE", configPath)
-			defer os.Setenv("AWS_CONFIG_FILE", oldConfigFile)
+			if err := os.Setenv("AWS_CONFIG_FILE", configPath); err != nil {
+				t.Fatalf("Failed to set AWS_CONFIG_FILE: %v", err)
+			}
+			defer func() {
+				if err := os.Setenv("AWS_CONFIG_FILE", oldConfigFile); err != nil {
+					t.Errorf("Failed to restore AWS_CONFIG_FILE: %v", err)
+				}
+			}()
 
 			got, err := ParseAWSConfig(tt.profile)
 			if tt.wantErr {
@@ -259,20 +265,32 @@ func TestHasStaticCredentials(t *testing.T) {
 			oldAccessKey := os.Getenv("AWS_ACCESS_KEY_ID")
 			oldSecretKey := os.Getenv("AWS_SECRET_ACCESS_KEY")
 			defer func() {
-				os.Setenv("AWS_ACCESS_KEY_ID", oldAccessKey)
-				os.Setenv("AWS_SECRET_ACCESS_KEY", oldSecretKey)
+				if err := os.Setenv("AWS_ACCESS_KEY_ID", oldAccessKey); err != nil {
+					t.Errorf("Failed to restore AWS_ACCESS_KEY_ID: %v", err)
+				}
+				if err := os.Setenv("AWS_SECRET_ACCESS_KEY", oldSecretKey); err != nil {
+					t.Errorf("Failed to restore AWS_SECRET_ACCESS_KEY: %v", err)
+				}
 			}()
 
 			// Set test values
 			if tt.accessKey != "" {
-				os.Setenv("AWS_ACCESS_KEY_ID", tt.accessKey)
+				if err := os.Setenv("AWS_ACCESS_KEY_ID", tt.accessKey); err != nil {
+					t.Fatalf("Failed to set AWS_ACCESS_KEY_ID: %v", err)
+				}
 			} else {
-				os.Unsetenv("AWS_ACCESS_KEY_ID")
+				if err := os.Unsetenv("AWS_ACCESS_KEY_ID"); err != nil {
+					t.Fatalf("Failed to unset AWS_ACCESS_KEY_ID: %v", err)
+				}
 			}
 			if tt.secretKey != "" {
-				os.Setenv("AWS_SECRET_ACCESS_KEY", tt.secretKey)
+				if err := os.Setenv("AWS_SECRET_ACCESS_KEY", tt.secretKey); err != nil {
+					t.Fatalf("Failed to set AWS_SECRET_ACCESS_KEY: %v", err)
+				}
 			} else {
-				os.Unsetenv("AWS_SECRET_ACCESS_KEY")
+				if err := os.Unsetenv("AWS_SECRET_ACCESS_KEY"); err != nil {
+					t.Fatalf("Failed to unset AWS_SECRET_ACCESS_KEY: %v", err)
+				}
 			}
 
 			got := HasStaticCredentials()
@@ -292,7 +310,9 @@ func TestGetAWSEnvVars(t *testing.T) {
 		for _, e := range originalEnv {
 			parts := strings.SplitN(e, "=", 2)
 			if len(parts) == 2 {
-				os.Setenv(parts[0], parts[1])
+				if err := os.Setenv(parts[0], parts[1]); err != nil {
+					t.Errorf("Failed to restore env var %s: %v", parts[0], err)
+				}
 			}
 		}
 	}()
@@ -310,11 +330,15 @@ func TestGetAWSEnvVars(t *testing.T) {
 	}
 
 	for k, v := range testVars {
-		os.Setenv(k, v)
+		if err := os.Setenv(k, v); err != nil {
+			t.Fatalf("Failed to set %s: %v", k, err)
+		}
 	}
 
 	// Also set a non-AWS variable to ensure it's not included
-	os.Setenv("NOT_AWS", "value")
+	if err := os.Setenv("NOT_AWS", "value"); err != nil {
+		t.Fatalf("Failed to set NOT_AWS: %v", err)
+	}
 
 	result := GetAWSEnvVars()
 
