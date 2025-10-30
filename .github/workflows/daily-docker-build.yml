@@ -79,14 +79,14 @@ jobs:
             echo 'Testing AI CLI installations...'
 
             # Test Claude Code
-            if command -v claude-code >/dev/null 2>&1; then
+            if command -v claude >/dev/null 2>&1; then
               echo '✅ Claude Code installed'
             else
               echo '❌ Claude Code missing' && exit 1
             fi
 
             # Test OpenAI Codex
-            if command -v codex >/dev/null 2>&1 || npm list -g @openai/codex >/dev/null 2>&1; then
+            if command -v codex >/dev/null 2>&1; then
               echo '✅ OpenAI Codex installed'
             else
               echo '❌ OpenAI Codex missing' && exit 1
@@ -127,12 +127,6 @@ jobs:
               echo '❌ GitHub CLI missing' && exit 1
             fi
 
-            # Test Cursor CLI (may not be in PATH but should be installed)
-            if command -v cursor >/dev/null 2>&1; then
-              echo '✅ Cursor CLI installed'
-            else
-              echo '⚠️ Cursor CLI not in PATH (this may be expected)'
-            fi
 
             echo 'All core AI CLI tools are properly installed!'
           "
