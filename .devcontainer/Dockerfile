@@ -35,19 +35,12 @@ RUN npm install -g @github/copilot
 # Layer 6: OpenAI Codex (frequent - weekly releases)
 RUN npm install -g @openai/codex
 
-# Layer 7: Cursor CLI (binary install, separate from npm)
-RUN curl -fsSL https://cursor.com/install | bash
-
-# Layer 8: Claude Code (most volatile - multiple releases per week)
+# Layer 7: Claude Code (most volatile - multiple releases per week)
 RUN npm install -g @anthropic-ai/claude-code
 
 # Disable auto-updaters for AI agents (we control updates via Docker builds)
 ENV DISABLE_AUTOUPDATER=true
 
-# Configure npm to disable update checks and audits for performance
-RUN npm config set -g update-check false && \
-    npm config set -g audit false && \
-    npm config set -g fund false
 
 # Ensure all tools are in PATH for all users
 ENV PATH="/usr/local/bin:${PATH}"
