@@ -20,6 +20,13 @@ This ensures:
 
 ## Key Development Practices
 
+### CRITICAL: Technical Accuracy and Verification
+- **NEVER invent technical details, environment variables, API endpoints, or configuration options**
+- **ALWAYS verify technical claims through official documentation, source code, or testing**
+- **STOP and ask for clarification rather than guessing technical specifications**
+- **When uncertain about technical details: research, verify, or explicitly state uncertainty**
+- **Making up technical details is a critical failure that breaks trust and creates bugs**
+
 ### Test-Driven Development
 - Write tests first for all new features
 - Follow RED → GREEN → REFACTOR cycle

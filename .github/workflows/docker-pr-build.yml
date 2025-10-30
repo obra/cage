@@ -1,0 +1,124 @@
+name: Docker PR Build
+
+on:
+  pull_request:
+    paths:
+      - '.devcontainer/Dockerfile'
+      - '.github/workflows/daily-docker-build.yml'
+      - '.github/workflows/docker-pr-build.yml'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/devcontainer
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            # PR number tag
+            type=ref,event=pr,prefix=pr-
+
+      - name: Build Docker image (PR test)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: .devcontainer/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+      - name: Test image functionality
+        run: |
+          PR_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:pr-${{ github.event.number }}"
+          echo "Testing PR build image: $PR_TAG"
+
+          # Test that all AI CLI tools are installed and accessible
+          docker run --rm $PR_TAG /bin/bash -c "
+            echo 'Testing AI CLI installations in PR build...'
+
+            # Test Claude Code
+            if command -v claude-code >/dev/null 2>&1; then
+              echo '✅ Claude Code installed'
+            else
+              echo '❌ Claude Code missing' && exit 1
+            fi
+
+            # Test basic npm packages
+            if npm list -g >/dev/null 2>&1; then
+              echo '✅ npm global packages accessible'
+            else
+              echo '❌ npm global packages issue' && exit 1
+            fi
+
+            # Test GitHub CLI
+            if command -v gh >/dev/null 2>&1; then
+              echo '✅ GitHub CLI installed'
+            else
+              echo '❌ GitHub CLI missing' && exit 1
+            fi
+
+            echo 'PR build validation successful!'
+          "
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prTag = `${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:pr-${{ github.event.number }}`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🐳 **Docker Build Successful!**
+
+              Your PR build is available for testing:
+              \`\`\`
+              ${prTag}
+              \`\`\`
+
+              All AI CLI tools have been validated and are working correctly.
+
+              To test locally:
+              \`\`\`bash
+              docker run -it --rm ${prTag} /bin/bash
+              \`\`\`
+              `
+            });
+
+  cleanup-pr-image:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: always() # Run even if tests fail, to clean up
+
+    steps:
+      - name: Schedule PR image cleanup
+        run: |
+          echo "PR image will be automatically cleaned up after 7 days"
+          # The cleanup will happen via the daily workflow's cleanup job

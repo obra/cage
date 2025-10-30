@@ -66,7 +66,9 @@
       "Bash(xargs curl -s)",
       "Skill(superpowers:systematic-debugging)",
       "Bash(git -C /workspace status)",
-      "Bash(git -C /workspace diff pkg/runner/runner.go)"
+      "Bash(git -C /workspace diff pkg/runner/runner.go)",
+      "Bash(docker pull:*)",
+      "mcp__private-journal__process_thoughts"
     ],
     "deny": [],
     "ask": []

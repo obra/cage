@@ -1,0 +1,152 @@
+name: Daily Docker Image Build
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC (when usage is typically lowest)
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Allow manual triggering
+  push:
+    paths:
+      - '.devcontainer/Dockerfile'
+      - '.github/workflows/daily-docker-build.yml'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/devcontainer
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            # Branch name
+            type=ref,event=branch
+            # Tag as 'latest' for main branch
+            type=raw,value=latest,enable={{is_default_branch}}
+            # Daily build tag with date
+            type=raw,value=daily-{{date 'YYYY-MM-DD'}}
+            # Shorter daily tag for convenience
+            type=raw,value={{date 'YYYY-MM-DD'}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: .devcontainer/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+
+      - name: Output image digest
+        run: echo ${{ steps.build.outputs.digest }}
+
+  test-image:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Test image functionality
+        run: |
+          echo "Testing daily build image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:daily-$(date +%Y-%m-%d)"
+
+          # Test that all AI CLI tools are installed and accessible
+          docker run --rm ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:daily-$(date +%Y-%m-%d) /bin/bash -c "
+            echo 'Testing AI CLI installations...'
+
+            # Test Claude Code
+            if command -v claude-code >/dev/null 2>&1; then
+              echo '✅ Claude Code installed'
+            else
+              echo '❌ Claude Code missing' && exit 1
+            fi
+
+            # Test OpenAI Codex
+            if command -v codex >/dev/null 2>&1 || npm list -g @openai/codex >/dev/null 2>&1; then
+              echo '✅ OpenAI Codex installed'
+            else
+              echo '❌ OpenAI Codex missing' && exit 1
+            fi
+
+            # Test GitHub Copilot
+            if npm list -g @github/copilot >/dev/null 2>&1; then
+              echo '✅ GitHub Copilot installed'
+            else
+              echo '❌ GitHub Copilot missing' && exit 1
+            fi
+
+            # Test Google Gemini CLI
+            if npm list -g @google/gemini-cli >/dev/null 2>&1; then
+              echo '✅ Google Gemini CLI installed'
+            else
+              echo '❌ Google Gemini CLI missing' && exit 1
+            fi
+
+            # Test Sourcegraph AMP
+            if npm list -g @sourcegraph/amp >/dev/null 2>&1; then
+              echo '✅ Sourcegraph AMP installed'
+            else
+              echo '❌ Sourcegraph AMP missing' && exit 1
+            fi
+
+            # Test Qwen Code
+            if npm list -g @qwen-code/qwen-code >/dev/null 2>&1; then
+              echo '✅ Qwen Code installed'
+            else
+              echo '❌ Qwen Code missing' && exit 1
+            fi
+
+            # Test GitHub CLI
+            if command -v gh >/dev/null 2>&1; then
+              echo '✅ GitHub CLI installed'
+            else
+              echo '❌ GitHub CLI missing' && exit 1
+            fi
+
+            # Test Cursor CLI (may not be in PATH but should be installed)
+            if command -v cursor >/dev/null 2>&1; then
+              echo '✅ Cursor CLI installed'
+            else
+              echo '⚠️ Cursor CLI not in PATH (this may be expected)'
+            fi
+
+            echo 'All core AI CLI tools are properly installed!'
+          "
+
+  cleanup-old-images:
+    needs: [build-and-push, test-image]
+    runs-on: ubuntu-latest
+    if: success()
+
+    steps:
+      - name: Delete old daily images
+        uses: actions/delete-package-versions@v4
+        with:
+          package-name: devcontainer
+          package-type: container
+          min-versions-to-keep: 7 # Keep last 7 daily builds
+          delete-only-untagged-versions: false
