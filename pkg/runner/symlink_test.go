@@ -47,8 +47,14 @@ func TestResolveSymlinkedFile(t *testing.T) {
 	}
 
 	// Should return the actual file path, not the symlink
-	if resolvedPath != actualGitconfig {
-		t.Errorf("resolveMountPath() = %s, want %s", resolvedPath, actualGitconfig)
+	// Use filepath.EvalSymlinks on expected path to handle platform differences (e.g., /var vs /private/var on macOS)
+	expectedPath, err := filepath.EvalSymlinks(actualGitconfig)
+	if err != nil {
+		t.Fatalf("Failed to evaluate symlinks on expected path: %v", err)
+	}
+
+	if resolvedPath != expectedPath {
+		t.Errorf("resolveMountPath() = %s, want %s", resolvedPath, expectedPath)
 	}
 }
 
@@ -73,9 +79,15 @@ func TestResolveRegularFile(t *testing.T) {
 		t.Fatalf("resolveMountPath failed: %v", err)
 	}
 
-	// Should return the same path for regular files
-	if resolvedPath != gitconfigPath {
-		t.Errorf("resolveMountPath() = %s, want %s", resolvedPath, gitconfigPath)
+	// Should return the same path for regular files (after resolving any system symlinks)
+	// Use filepath.EvalSymlinks on expected path to handle platform differences (e.g., /var vs /private/var on macOS)
+	expectedPath, err := filepath.EvalSymlinks(gitconfigPath)
+	if err != nil {
+		t.Fatalf("Failed to evaluate symlinks on expected path: %v", err)
+	}
+
+	if resolvedPath != expectedPath {
+		t.Errorf("resolveMountPath() = %s, want %s", resolvedPath, expectedPath)
 	}
 }
 
