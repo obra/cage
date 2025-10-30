@@ -10,10 +10,16 @@ import (
 
 func TestExpandEnvVars(t *testing.T) {
 	// Set test environment variables
-	os.Setenv("TEST_API_KEY", "sk-test-123")
-	os.Setenv("TEST_URL", "https://api.example.com")
-	defer os.Unsetenv("TEST_API_KEY")
-	defer os.Unsetenv("TEST_URL")
+	if err := os.Setenv("TEST_API_KEY", "sk-test-123"); err != nil {
+		t.Fatalf("Failed to set TEST_API_KEY: %v", err)
+	}
+	if err := os.Setenv("TEST_URL", "https://api.example.com"); err != nil {
+		t.Fatalf("Failed to set TEST_URL: %v", err)
+	}
+	defer func() {
+		_ = os.Unsetenv("TEST_API_KEY")
+		_ = os.Unsetenv("TEST_URL")
+	}()
 
 	tests := []struct {
 		name     string
@@ -64,10 +70,16 @@ func TestExpandEnvVars(t *testing.T) {
 
 func TestApplyEnvConfig(t *testing.T) {
 	// Set test environment variables
-	os.Setenv("Z_AI_API_KEY", "zai-123")
-	os.Setenv("ANTHROPIC_API_KEY", "sk-ant-456")
-	defer os.Unsetenv("Z_AI_API_KEY")
-	defer os.Unsetenv("ANTHROPIC_API_KEY")
+	if err := os.Setenv("Z_AI_API_KEY", "zai-123"); err != nil {
+		t.Fatalf("Failed to set Z_AI_API_KEY: %v", err)
+	}
+	if err := os.Setenv("ANTHROPIC_API_KEY", "sk-ant-456"); err != nil {
+		t.Fatalf("Failed to set ANTHROPIC_API_KEY: %v", err)
+	}
+	defer func() {
+		_ = os.Unsetenv("Z_AI_API_KEY")
+		_ = os.Unsetenv("ANTHROPIC_API_KEY")
+	}()
 
 	tests := []struct {
 		name     string

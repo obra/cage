@@ -263,6 +263,6 @@ func cacheUserResult(imageID string, result *UserDetectionResult) {
 	}
 
 	if err := os.Rename(tempFile, cacheFilePath); err != nil {
-		os.Remove(tempFile) // Cleanup on failure
+		_ = os.Remove(tempFile) // Cleanup on failure
 	}
 }

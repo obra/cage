@@ -33,6 +33,7 @@ type Credentials struct {
 	GH  bool `json:"gh"`  // GitHub CLI credentials
 	GPG bool `json:"gpg"` // GPG keys for commit signing
 	NPM bool `json:"npm"` // npm credentials
+	AWS bool `json:"aws"` // AWS credentials
 }
 
 // GetConfigPath returns the path to the config file
@@ -140,7 +141,7 @@ func interactiveSetup(configPath string) (*Config, error) {
 	}
 
 	var selectedRuntime string
-	var sshCreds, ghCreds, gpgCreds, npmCreds, saveConfig bool
+	var sshCreds, ghCreds, gpgCreds, npmCreds, awsCreds, saveConfig bool
 
 	// Set sensible defaults - SSH and auth credentials should be user choice
 	// Git config is just identity info, not credentials
@@ -190,6 +191,13 @@ func interactiveSetup(configPath string) (*Config, error) {
 				Value(&npmCreds).
 				Affirmative("Yes").
 				Negative("No"),
+
+			huh.NewConfirm().
+				Title("Enable AWS credentials?").
+				Description("Mounts ~/.aws and passes AWS environment variables (supports SSO, credential_process, static)").
+				Value(&awsCreds).
+				Affirmative("Yes").
+				Negative("No"),
 		),
 		huh.NewGroup(
 			huh.NewConfirm().
@@ -215,6 +223,7 @@ func interactiveSetup(configPath string) (*Config, error) {
 			GH:  ghCreds,
 			GPG: gpgCreds,
 			NPM: npmCreds,
+			AWS: awsCreds,
 		},
 		DefaultEnvVars: []string{
 			"ANTHROPIC_API_KEY",

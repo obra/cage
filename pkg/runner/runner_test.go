@@ -11,8 +11,14 @@ import (
 func TestGetOrCreateContainerCredentialFile(t *testing.T) {
 	// Use temp directory for test
 	tempDir := t.TempDir()
-	os.Setenv("XDG_DATA_HOME", tempDir)
-	defer os.Unsetenv("XDG_DATA_HOME")
+	if err := os.Setenv("XDG_DATA_HOME", tempDir); err != nil {
+		t.Fatalf("Failed to set XDG_DATA_HOME: %v", err)
+	}
+	defer func() {
+		if err := os.Unsetenv("XDG_DATA_HOME"); err != nil {
+			t.Errorf("Failed to unset XDG_DATA_HOME: %v", err)
+		}
+	}()
 
 	// Test file creation
 	credFile, err := getOrCreateContainerCredentialFile("test-container")

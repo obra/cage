@@ -29,8 +29,14 @@ func TestDetectDockerCLI(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.envVar != "" {
-				os.Setenv("DOCKER_CMD", tt.envVar)
-				defer os.Unsetenv("DOCKER_CMD")
+				if err := os.Setenv("DOCKER_CMD", tt.envVar); err != nil {
+					t.Fatalf("Failed to set DOCKER_CMD: %v", err)
+				}
+				defer func() {
+					if err := os.Unsetenv("DOCKER_CMD"); err != nil {
+						t.Errorf("Failed to unset DOCKER_CMD: %v", err)
+					}
+				}()
 			}
 
 			client := &Client{}

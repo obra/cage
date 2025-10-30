@@ -29,6 +29,7 @@ var (
 	runGHCreds  *bool
 	runGPGCreds *bool
 	runNPMCreds *bool
+	runAWSCreds *bool
 	runAllCreds bool
 )
 
@@ -90,12 +91,16 @@ var runCmd = &cobra.Command{
 		if cmd.Flags().Changed("npm-creds") {
 			creds.NPM = *runNPMCreds
 		}
+		if cmd.Flags().Changed("aws-creds") {
+			creds.AWS = *runAWSCreds
+		}
 		if runAllCreds {
 			creds.Git = true
 			creds.SSH = true
 			creds.GH = true
 			creds.GPG = true
 			creds.NPM = true
+			creds.AWS = true
 		}
 
 		// Determine which runtime to use (flag > config > detect)
@@ -161,6 +166,7 @@ func init() {
 	runGHCreds = runCmd.Flags().Bool("gh-creds", false, "Mount GitHub CLI credentials")
 	runGPGCreds = runCmd.Flags().Bool("gpg-creds", false, "Mount GPG credentials for commit signing")
 	runNPMCreds = runCmd.Flags().Bool("npm-creds", false, "Mount npm credentials")
+	runAWSCreds = runCmd.Flags().Bool("aws-creds", false, "Mount AWS credentials")
 	runCmd.Flags().BoolVar(&runAllCreds, "all-creds", false, "Mount all available credentials")
 }
 

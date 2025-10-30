@@ -9,6 +9,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/obra/packnplay/pkg/aws"
 	"github.com/obra/packnplay/pkg/config"
 	"github.com/obra/packnplay/pkg/container"
 	"github.com/obra/packnplay/pkg/devcontainer"
@@ -379,6 +380,89 @@ To stop the existing container:
 		}
 	}
 
+	// AWS credentials handling
+	// Track which credentials we obtained and from where to enforce priority order
+	var awsCredentials map[string]string
+	var awsCredSource string
+
+	if config.Credentials.AWS {
+		awsCredentials = make(map[string]string)
+
+		// Priority 1: Check if static credentials are already set in environment
+		if aws.HasStaticCredentials() {
+			if config.Verbose {
+				fmt.Fprintf(os.Stderr, "Using existing AWS credentials from environment variables\n")
+			}
+			// Get all AWS_* env vars from host, these will be added later
+			for key, value := range aws.GetAWSEnvVars() {
+				awsCredentials[key] = value
+			}
+		} else {
+			// Priority 2: Try credential_process if AWS_PROFILE is set
+			awsProfile := os.Getenv("AWS_PROFILE")
+			if awsProfile != "" {
+				credentialProcess, err := aws.ParseAWSConfig(awsProfile)
+				if err != nil {
+					// Always warn, not just in verbose mode
+					fmt.Fprintf(os.Stderr, "Warning: failed to get credential_process for profile '%s': %v\n", awsProfile, err)
+				} else {
+					if config.Verbose {
+						fmt.Fprintf(os.Stderr, "Executing credential_process for profile '%s'\n", awsProfile)
+					}
+					creds, err := aws.GetCredentialsFromProcess(credentialProcess)
+					if err != nil {
+						// Always warn, not just in verbose mode
+						fmt.Fprintf(os.Stderr, "Warning: credential_process failed: %v\n", err)
+					} else {
+						awsCredSource = "credential_process"
+						if config.Verbose {
+							fmt.Fprintf(os.Stderr, "Successfully obtained AWS credentials from credential_process\n")
+						}
+						// Add credentials from credential_process
+						awsCredentials["AWS_ACCESS_KEY_ID"] = creds.AccessKeyID
+						awsCredentials["AWS_SECRET_ACCESS_KEY"] = creds.SecretAccessKey
+						if creds.SessionToken != "" {
+							awsCredentials["AWS_SESSION_TOKEN"] = creds.SessionToken
+						}
+						// Also include other AWS_* env vars (region, profile, etc.) but not credentials
+						for key, value := range aws.GetAWSEnvVars() {
+							if key != "AWS_ACCESS_KEY_ID" && key != "AWS_SECRET_ACCESS_KEY" && key != "AWS_SESSION_TOKEN" {
+								awsCredentials[key] = value
+							}
+						}
+					}
+				}
+			} else if config.Verbose {
+				fmt.Fprintf(os.Stderr, "No AWS_PROFILE set, skipping credential_process lookup\n")
+			}
+
+			// If credential_process didn't work, try getting from environment anyway
+			if awsCredSource == "" {
+				for key, value := range aws.GetAWSEnvVars() {
+					awsCredentials[key] = value
+				}
+				if len(awsCredentials) > 0 {
+					if config.Verbose {
+						fmt.Fprintf(os.Stderr, "Using AWS environment variables from host\n")
+					}
+				}
+			}
+		}
+
+		// Mount ~/.aws directory if it exists (read-write for SSO token refresh)
+		awsPath := filepath.Join(homeDir, ".aws")
+		if fileExists(awsPath) {
+			// Use read-write mount to allow SSO token refresh and CLI caching
+			args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.aws", awsPath, devConfig.RemoteUser))
+			if config.Verbose {
+				fmt.Fprintf(os.Stderr, "Mounting AWS config directory (read-write for token refresh)\n")
+			}
+		} else {
+			// Always warn if ~/.aws is missing, not just in verbose
+			fmt.Fprintf(os.Stderr, "Warning: ~/.aws directory not found, AWS CLI config and SSO cache unavailable\n")
+		}
+	}
+
 	workingDir := "/workspace"
 
 	// Set working directory
@@ -408,7 +492,38 @@ To stop the existing container:
 		}
 	}
 
-	// Add user-specified env vars from --env flags (these can override defaults)
+	// Add AWS environment variables BEFORE user-specified env vars
+	// This allows users to override AWS credentials if needed with --env flags
+	if config.Credentials.AWS && len(awsCredentials) > 0 {
+		// Add in deterministic order to avoid randomness from map iteration
+		// Priority order: credentials first, then config vars
+		credentialKeys := []string{"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"}
+		for _, key := range credentialKeys {
+			if value, exists := awsCredentials[key]; exists {
+				args = append(args, "-e", fmt.Sprintf("%s=%s", key, value))
+			}
+		}
+		// Then add other AWS vars (region, profile, etc.) in sorted order
+		var otherKeys []string
+		for key := range awsCredentials {
+			isCredKey := false
+			for _, credKey := range credentialKeys {
+				if key == credKey {
+					isCredKey = true
+					break
+				}
+			}
+			if !isCredKey {
+				otherKeys = append(otherKeys, key)
+			}
+		}
+		// Sort for deterministic output
+		for _, key := range otherKeys {
+			args = append(args, "-e", fmt.Sprintf("%s=%s", key, awsCredentials[key]))
+		}
+	}
+
+	// Add user-specified env vars from --env flags (these can override defaults and AWS)
 	for _, env := range config.Env {
 		// Support both --env KEY=value and --env KEY (pass through from host)
 		if strings.Contains(env, "=") {
@@ -748,7 +863,7 @@ func copyFileViaExec(dockerClient *docker.Client, containerID, srcPath, dstPath,
 	if err != nil {
 		return fmt.Errorf("failed to create temp dir: %w", err)
 	}
-	defer os.RemoveAll(tempDir)
+	defer func() { _ = os.RemoveAll(tempDir) }()
 
 	// Copy file to temp directory
 	tempFileName := filepath.Base(srcPath)

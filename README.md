@@ -24,7 +24,8 @@ I built packnplay as a lightweight container/worktree launcher for my coding age
 - **Docker-Compatible Port Mapping**: Expose container ports to host with familiar `-p` syntax
 - **Automatic Worktree Management**: Creates git worktrees in XDG-compliant locations (`~/.local/share/packnplay/worktrees`)
 - **Dev Container Support**: Uses project's `.devcontainer/devcontainer.json` or feature-rich default with AI CLIs pre-installed
-- **Credential Management**: Interactive first-run setup for git, GitHub CLI, GPG, and npm credentials
+- **Credential Management**: Interactive first-run setup for git, GitHub CLI, GPG, npm, and AWS credentials
+- **AWS Credentials Support**: Intelligent handling of AWS credentials including SSO, credential_process (granted.dev, aws-vault), and static credentials
 - **Clean Environment**: Only passes safe environment variables (terminal/locale), no host pollution
 - **macOS Keychain Integration**: Automatically extracts Claude and GitHub CLI credentials from macOS Keychain
 
@@ -43,7 +44,7 @@ go install github.com/obra/packnplay@latest
 
 ## Quick Start
 
-On first run, packnplay will prompt you to configure which credentials to mount (git, GitHub CLI, GPG, npm). Your choices are saved to `~/.config/packnplay/config.json`.
+On first run, packnplay will prompt you to configure which credentials to mount (git, GitHub CLI, GPG, npm, AWS). Your choices are saved to `~/.config/packnplay/config.json`.
 
 ```bash
 # Run Claude Code in a sandboxed container (creates worktree automatically)
@@ -109,8 +110,53 @@ packnplay run --ssh-creds claude           # Mount SSH keys (~/.ssh)
 packnplay run --gh-creds claude            # Mount GitHub CLI credentials
 packnplay run --gpg-creds claude           # Mount GPG keys for signing
 packnplay run --npm-creds claude           # Mount npm credentials
+packnplay run --aws-creds claude           # Mount AWS credentials
 packnplay run --all-creds claude           # Mount all available credentials
 ```
+
+#### AWS Credentials
+
+The `--aws-creds` flag provides intelligent AWS credential handling with multiple strategies:
+
+**Priority Order:**
+1. **Static credentials** from environment variables (if `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are set)
+2. **Dynamic credentials** via `credential_process` (if `AWS_PROFILE` is set and profile has `credential_process` configured)
+3. **All other AWS environment variables** (`AWS_REGION`, `AWS_DEFAULT_REGION`, etc.)
+
+**What happens:**
+- Mounts `~/.aws` directory (read-write for SSO token refresh and CLI caching)
+- If `AWS_PROFILE` is set and no static credentials exist:
+  - Parses `~/.aws/config` (or `$AWS_CONFIG_FILE` if set)
+  - Executes `credential_process` command on the host
+  - Injects credentials into container as environment variables
+- Passes all `AWS_*` environment variables (excluding host-specific container metadata)
+
+**Supported credential tools:**
+- AWS SSO
+- [granted.dev](https://granted.dev)
+- [aws-vault](https://github.com/99designs/aws-vault)
+- Any tool using AWS `credential_process` standard
+
+**Example:**
+
+```bash
+# With granted.dev
+export AWS_PROFILE=my-profile
+packnplay run --aws-creds aws s3 ls
+
+# With static credentials
+export AWS_ACCESS_KEY_ID=AKIA...
+export AWS_SECRET_ACCESS_KEY=...
+packnplay run --aws-creds aws s3 ls
+
+# Override credentials per invocation
+packnplay run --aws-creds --env AWS_REGION=eu-west-1 aws ec2 describe-instances
+```
+
+**Notes:**
+- `credential_process` executes on the host with a 30-second timeout
+- Credentials from `credential_process` may expire (snapshot at container start, not refreshed)
+- User can override any AWS variable using `--env` flags (they take precedence)
 
 ### Port Mapping
 
