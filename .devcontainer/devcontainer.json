@@ -1,9 +1,49 @@
 {
-  "name": "packnplay Default Container with AI CLIs",
-  "dockerFile": "Dockerfile",
+  "name": "packnplay Universal Development Container",
+  "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
   "remoteUser": "vscode",
   "features": {
-    "ghcr.io/devcontainers/features/common-utils:2": {},
-    "ghcr.io/devcontainers/features/git:1": {}
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "installOhMyZsh": true,
+      "upgradePackages": true
+    },
+    "ghcr.io/devcontainers/features/git:1": {
+      "version": "latest",
+      "ppa": true
+    },
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "lts"
+    },
+    "ghcr.io/devcontainers/features/go:1": {
+      "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.11"
+    },
+    "ghcr.io/devcontainers/features/rust:1": {
+      "version": "latest",
+      "profile": "default"
+    },
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/aws-cli:1": {},
+    "ghcr.io/devcontainers/features/terraform:1": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:1": {
+      "version": "latest",
+      "moby": true
+    }
+  },
+  "postCreateCommand": "npm install -g @anthropic-ai/claude-code @openai/codex @google/gemini-cli @github/copilot @qwen-code/qwen-code @sourcegraph/amp && curl -fsSL https://cursor.com/install.sh | sh",
+  "containerEnv": {
+    "DISABLE_AUTOUPDATER": "true"
+  },
+  "forwardPorts": [3000, 8080],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-vscode-remote.remote-containers",
+        "github.copilot"
+      ]
+    }
   }
 }

@@ -10,9 +10,15 @@ import (
 
 // Config represents a parsed devcontainer.json
 type Config struct {
-	Image       string `json:"image"`
-	DockerFile  string `json:"dockerFile"`
-	RemoteUser  string `json:"remoteUser"`
+	Image             string                 `json:"image"`
+	DockerFile        string                 `json:"dockerFile"`
+	RemoteUser        string                 `json:"remoteUser"`
+	Features          map[string]interface{} `json:"features"`
+	PostCreateCommand interface{}            `json:"postCreateCommand"`
+	ForwardPorts      []interface{}          `json:"forwardPorts"`
+	Mounts            []interface{}          `json:"mounts"`
+	ContainerEnv      map[string]string      `json:"containerEnv"`
+	Name              string                 `json:"name"`
 }
 
 // LoadConfig loads and parses .devcontainer/devcontainer.json if it exists
@@ -46,6 +52,47 @@ func LoadConfig(projectPath string) (*Config, error) {
 	}
 
 	return &config, nil
+}
+
+// HasFeatures returns true if the config has features defined
+func (c *Config) HasFeatures() bool {
+	return c.Features != nil && len(c.Features) > 0
+}
+
+// GetFeatureList returns a list of feature identifiers
+func (c *Config) GetFeatureList() []string {
+	if !c.HasFeatures() {
+		return nil
+	}
+
+	features := make([]string, 0, len(c.Features))
+	for featureID := range c.Features {
+		features = append(features, featureID)
+	}
+	return features
+}
+
+// GetFeatureOptions returns the options for a specific feature
+func (c *Config) GetFeatureOptions(featureID string) map[string]interface{} {
+	if !c.HasFeatures() {
+		return nil
+	}
+
+	options, exists := c.Features[featureID]
+	if !exists {
+		return nil
+	}
+
+	// Handle different option formats
+	switch opts := options.(type) {
+	case map[string]interface{}:
+		return opts
+	case nil:
+		return make(map[string]interface{}) // Empty options
+	default:
+		// Convert other types to a map with a default key
+		return map[string]interface{}{"value": opts}
+	}
 }
 
 // GetDefaultConfig returns the default devcontainer config
