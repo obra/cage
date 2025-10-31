@@ -49,7 +49,7 @@ func runInteractiveConfigure(verbose bool) error {
 
 // configureAll implements the complete configuration flow
 func configureAll(existing *config.Config, configPath string, verbose bool) error {
-	return fmt.Errorf("not implemented")
+	return config.RunInteractiveConfiguration(existing, configPath, verbose)
 }
 
 func init() {

@@ -11,7 +11,7 @@ import (
 var refreshVerbose bool
 
 var refreshCmd = &cobra.Command{
-	Use:   "refresh-default-container",
+	Use:   "refresh-container",
 	Short: "Pull latest version of default container image",
 	Long:  `Force pull the latest version of the configured default container image to get updated tools and dependencies.`,
 	RunE: func(cmd *cobra.Command, args []string) error {

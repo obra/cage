@@ -11,8 +11,8 @@ func TestRefreshCommand(t *testing.T) {
 		t.Error("refreshCmd should be defined")
 	}
 
-	if refreshCmd.Use != "refresh-default-container" {
-		t.Errorf("refresh command Use = %v, want refresh-default-container", refreshCmd.Use)
+	if refreshCmd.Use != "refresh-container" {
+		t.Errorf("refresh command Use = %v, want refresh-container", refreshCmd.Use)
 	}
 
 	if refreshCmd.Short == "" {

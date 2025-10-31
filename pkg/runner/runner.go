@@ -1084,7 +1084,7 @@ func formatVersionNotification(imageName string, localInfo, remoteInfo *ImageVer
    Current: %s (%s)
    Latest:  %s (%s)
 
-   To update: packnplay refresh-default-container`,
+   To update: packnplay refresh-container`,
 		imageName,
 		localInfo.ShortDigest(), localInfo.AgeString(),
 		remoteInfo.ShortDigest(), remoteInfo.AgeString())

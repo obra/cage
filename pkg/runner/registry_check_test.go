@@ -96,7 +96,7 @@ func TestNotificationMessage(t *testing.T) {
 	}
 
 	// Should contain refresh command
-	if !containsString(message, "packnplay refresh-default-container") {
+	if !containsString(message, "packnplay refresh-container") {
 		t.Errorf("Message should contain refresh command: %s", message)
 	}
 }

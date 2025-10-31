@@ -259,13 +259,13 @@ When enabled, packnplay checks for new versions and shows detailed notifications
    Current: abc123de (2 days old)
    Latest:  xyz789gh (just released)
 
-   To update: packnplay refresh-default-container
+   To update: packnplay refresh-container
 ```
 
 **Features:**
 - **Smart notifications**: Only notifies once per version, respects frequency settings
 - **Detailed version info**: Shows current vs latest with digests and age
-- **User control**: Manual refresh command with `packnplay refresh-default-container`
+- **User control**: Manual refresh command with `packnplay refresh-container`
 - **Configurable checking**: Enable/disable update checking and auto-pull behavior
 - **Non-intrusive**: Checking happens in background, notifications only when needed
 

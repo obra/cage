@@ -250,6 +250,110 @@ func SaveConfig(cfg *Config, configPath string) error {
 	return os.WriteFile(configPath, data, 0644)
 }
 
+// RunInteractiveConfiguration runs the interactive configuration flow, preserving existing settings
+func RunInteractiveConfiguration(existing *Config, configPath string, verbose bool) error {
+	fmt.Println("\n⚙️  packnplay Configuration")
+	fmt.Println("Configure packnplay settings. Existing values preserved.")
+
+	// Detect available container runtimes
+	available := detectAvailableRuntimes()
+	if len(available) == 0 {
+		return fmt.Errorf("no container runtime found (tried: docker, podman, container)")
+	}
+
+	// Initialize variables with current values
+	selectedRuntime := existing.ContainerRuntime
+	if selectedRuntime == "" {
+		selectedRuntime = available[0] // Default to first available
+	}
+
+	// Initialize credential settings with current values
+	sshCreds := existing.DefaultCredentials.SSH
+	ghCreds := existing.DefaultCredentials.GH
+	gpgCreds := existing.DefaultCredentials.GPG
+	npmCreds := existing.DefaultCredentials.NPM
+	awsCreds := existing.DefaultCredentials.AWS
+
+	// Build runtime selection options
+	runtimeOptions := make([]huh.Option[string], len(available))
+	for i, rt := range available {
+		runtimeOptions[i] = huh.NewOption(rt, rt)
+	}
+
+	form := huh.NewForm(
+		// First group: Select container runtime
+		huh.NewGroup(
+			huh.NewSelect[string]().
+				Title("Select container runtime").
+				Description("Choose which container CLI to use").
+				Options(runtimeOptions...).
+				Value(&selectedRuntime),
+		),
+		// Second group: Credentials
+		huh.NewGroup(
+			huh.NewConfirm().
+				Title("Enable SSH keys?").
+				Description("Mounts ~/.ssh (read-only) for SSH authentication to servers and repos").
+				Value(&sshCreds).
+				Affirmative("Yes").
+				Negative("No"),
+
+			huh.NewConfirm().
+				Title("Enable GitHub CLI credentials?").
+				Description("Mounts gh config for authenticated GitHub operations").
+				Value(&ghCreds).
+				Affirmative("Yes").
+				Negative("No"),
+
+			huh.NewConfirm().
+				Title("Enable GPG credentials?").
+				Description("Mounts ~/.gnupg (read-only) for commit signing").
+				Value(&gpgCreds).
+				Affirmative("Yes").
+				Negative("No"),
+
+			huh.NewConfirm().
+				Title("Enable npm credentials?").
+				Description("Mounts ~/.npmrc for authenticated npm operations").
+				Value(&npmCreds).
+				Affirmative("Yes").
+				Negative("No"),
+
+			huh.NewConfirm().
+				Title("Enable AWS credentials?").
+				Description("Mounts ~/.aws and passes AWS environment variables").
+				Value(&awsCreds).
+				Affirmative("Yes").
+				Negative("No"),
+		),
+	)
+
+	err := form.Run()
+	if err != nil {
+		return fmt.Errorf("interactive configuration failed: %w", err)
+	}
+
+	// Apply updates safely (preserves unshown settings)
+	updates := ConfigUpdates{
+		ContainerRuntime: &selectedRuntime,
+		DefaultCredentials: &Credentials{
+			Git: true, // Always copy .gitconfig (it's config, not credentials)
+			SSH: sshCreds,
+			GH:  ghCreds,
+			GPG: gpgCreds,
+			NPM: npmCreds,
+			AWS: awsCreds,
+		},
+	}
+
+	if err := UpdateConfigSafely(configPath, updates); err != nil {
+		return fmt.Errorf("failed to save configuration: %w", err)
+	}
+
+	fmt.Printf("\n✅ Configuration saved to %s\n", configPath)
+	return nil
+}
+
 // GetConfigPath returns the path to the config file
 func GetConfigPath() string {
 	configHome := os.Getenv("XDG_CONFIG_HOME")
