@@ -164,6 +164,92 @@ func ShouldCheckForUpdates(config DefaultContainerConfig, lastCheck time.Time) b
 	return shouldCheckForUpdates(config, lastCheck)
 }
 
+// ConfigUpdates represents partial config updates that preserve unshown settings
+type ConfigUpdates struct {
+	ContainerRuntime   *string      `json:"container_runtime,omitempty"`
+	DefaultCredentials *Credentials `json:"default_credentials,omitempty"`
+	DefaultContainer   *DefaultContainerConfig `json:"default_container,omitempty"`
+}
+
+// LoadExistingOrEmpty loads config from file or returns empty config if file doesn't exist
+func LoadExistingOrEmpty(configPath string) (*Config, error) {
+	if _, err := os.Stat(configPath); os.IsNotExist(err) {
+		// Return empty config with defaults
+		return &Config{
+			DefaultContainer: GetDefaultContainerConfig(),
+			DefaultEnvVars:   []string{},
+			EnvConfigs:       make(map[string]EnvConfig),
+		}, nil
+	}
+
+	return LoadConfigFromFile(configPath)
+}
+
+// LoadConfigFromFile loads config from specified file
+func LoadConfigFromFile(configPath string) (*Config, error) {
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read config: %w", err)
+	}
+
+	var cfg Config
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return nil, fmt.Errorf("failed to parse config: %w", err)
+	}
+
+	return &cfg, nil
+}
+
+// UpdateConfigSafely updates only specified fields, preserving others
+func UpdateConfigSafely(configPath string, updates ConfigUpdates) error {
+	// Load existing config
+	cfg, err := LoadExistingOrEmpty(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to load existing config: %w", err)
+	}
+
+	// Apply updates only to specified fields
+	if updates.ContainerRuntime != nil {
+		cfg.ContainerRuntime = *updates.ContainerRuntime
+	}
+
+	if updates.DefaultCredentials != nil {
+		cfg.DefaultCredentials = *updates.DefaultCredentials
+	}
+
+	if updates.DefaultContainer != nil {
+		cfg.DefaultContainer = *updates.DefaultContainer
+	}
+
+	// Save updated config
+	return SaveConfig(cfg, configPath)
+}
+
+// applyCredentialUpdates applies credential updates to config, preserving other settings
+func applyCredentialUpdates(original *Config, credUpdates Credentials) *Config {
+	// Create copy to avoid modifying original
+	updated := *original
+	updated.DefaultCredentials = credUpdates
+	return &updated
+}
+
+// SaveConfig saves config to file
+func SaveConfig(cfg *Config, configPath string) error {
+	// Ensure directory exists
+	dir := filepath.Dir(configPath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create config directory: %w", err)
+	}
+
+	// Marshal and save
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	return os.WriteFile(configPath, data, 0644)
+}
+
 // GetConfigPath returns the path to the config file
 func GetConfigPath() string {
 	configHome := os.Getenv("XDG_CONFIG_HOME")
