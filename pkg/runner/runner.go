@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/obra/packnplay/pkg/aws"
 	"github.com/obra/packnplay/pkg/config"
@@ -719,6 +720,22 @@ func ensureImage(dockerClient *docker.Client, config *devcontainer.Config, proje
 			if err != nil {
 				return fmt.Errorf("failed to pull image %s: %w\nDocker output:\n%s", imageName, err, output)
 			}
+		} else {
+			// Image exists locally - check if we should update it
+			age, ageErr := getImageAge(dockerClient, imageName)
+			if ageErr == nil && shouldUpdateImage(imageName, age, false) {
+				if verbose {
+					fmt.Fprintf(os.Stderr, "Image %s is %v old, pulling latest version\n", imageName, age.Truncate(time.Hour))
+				}
+
+				_, err := dockerClient.Run("pull", imageName)
+				if err != nil {
+					// Don't fail the whole operation if update fails, just warn
+					fmt.Fprintf(os.Stderr, "Warning: failed to update image %s: %v\n", imageName, err)
+				} else if verbose {
+					fmt.Fprintf(os.Stderr, "Successfully updated %s\n", imageName)
+				}
+			}
 		}
 	}
 
@@ -942,6 +959,87 @@ func generateDirectoryCreationCommands(hostPath string) [][]string {
 	}
 
 	return commands
+}
+
+// getImageAge returns how long ago the image was created/pulled locally
+func getImageAge(dockerClient *docker.Client, imageName string) (time.Duration, error) {
+	// Get image creation date
+	output, err := dockerClient.Run("image", "inspect", "--format", "{{.Created}}", imageName)
+	if err != nil {
+		return 0, fmt.Errorf("failed to inspect image: %w", err)
+	}
+
+	// Parse the timestamp
+	created, err := time.Parse(time.RFC3339, strings.TrimSpace(output))
+	if err != nil {
+		return 0, fmt.Errorf("failed to parse image timestamp: %w", err)
+	}
+
+	return time.Since(created), nil
+}
+
+// shouldUpdateImage determines if an image should be updated based on age and policies
+func shouldUpdateImage(imageName string, age time.Duration, forceUpdate bool) bool {
+	if forceUpdate {
+		return true
+	}
+
+	// Only auto-update :latest images
+	if !strings.HasSuffix(imageName, ":latest") {
+		return false
+	}
+
+	// Update if older than 24 hours
+	return age > 24*time.Hour
+}
+
+// ImageUpdateAction represents what action to take for an image
+type ImageUpdateAction struct {
+	action string // "use", "pull", "skip"
+	reason string
+}
+
+// imageUpdateAction determines what action to take for an image
+func imageUpdateAction(imageName string, forceUpdate bool) ImageUpdateAction {
+	// Default action for missing image
+	return ImageUpdateAction{
+		action: "pull",
+		reason: "image not found locally",
+	}
+}
+
+// RefreshDefaultContainer forces a pull of the default container image
+func RefreshDefaultContainer(verbose bool) error {
+	// Get default image name
+	defaultImage := "ghcr.io/obra/packnplay-default:latest"
+
+	dockerClient, err := docker.NewClient(verbose)
+	if err != nil {
+		return fmt.Errorf("failed to initialize docker: %w", err)
+	}
+
+	if verbose {
+		fmt.Printf("Pulling latest version of %s...\n", defaultImage)
+	}
+
+	output, err := dockerClient.Run("pull", defaultImage)
+	if err != nil {
+		return fmt.Errorf("failed to pull image %s: %w\nDocker output:\n%s", defaultImage, err, output)
+	}
+
+	if verbose {
+		fmt.Printf("Successfully updated %s\n", defaultImage)
+	} else {
+		fmt.Printf("Default container updated to latest version\n")
+	}
+
+	return nil
+}
+
+// Helper function for tests
+func isImageNotFoundError(err error) bool {
+	return strings.Contains(err.Error(), "No such image") ||
+		   strings.Contains(err.Error(), "image not found")
 }
 
 // getOrCreateContainerCredentialFile manages shared credential file for all containers
