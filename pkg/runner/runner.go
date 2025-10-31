@@ -30,6 +30,8 @@ type RunConfig struct {
 	Credentials    config.Credentials
 	DefaultEnvVars []string // API keys to proxy from host
 	PublishPorts   []string // Port mappings to publish to host
+	HostPath       string   // Host directory path for the container
+	LaunchCommand  string   // Original command line used to launch
 }
 
 func Run(config *RunConfig) error {
@@ -142,7 +144,14 @@ func Run(config *RunConfig) error {
 	// Step 6: Generate container name and labels
 	projectName := filepath.Base(workDir)
 	containerName := container.GenerateContainerName(workDir, worktreeName)
-	labels := container.GenerateLabels(projectName, worktreeName)
+
+	// Use enhanced labels if launch info is available
+	var labels map[string]string
+	if config.HostPath != "" && config.LaunchCommand != "" {
+		labels = container.GenerateLabelsWithLaunchInfo(projectName, worktreeName, config.HostPath, config.LaunchCommand)
+	} else {
+		labels = container.GenerateLabels(projectName, worktreeName)
+	}
 
 	// Step 7: Check if container already running
 	if isRunning, err := containerIsRunning(dockerClient, containerName); err != nil {

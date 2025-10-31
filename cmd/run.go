@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -119,6 +120,24 @@ var runCmd = &cobra.Command{
 			}
 		}
 
+		// Determine host path for labels
+		hostPath := runPath
+		if hostPath == "" {
+			var err error
+			hostPath, err = os.Getwd()
+			if err != nil {
+				return fmt.Errorf("failed to get working directory: %w", err)
+			}
+		}
+		// Make absolute
+		hostPath, err = filepath.Abs(hostPath)
+		if err != nil {
+			return fmt.Errorf("failed to resolve path: %w", err)
+		}
+
+		// Capture original command line for debugging
+		launchCommand := strings.Join(os.Args, " ")
+
 		runConfig := &runner.RunConfig{
 			Path:           runPath,
 			Worktree:       runWorktree,
@@ -132,6 +151,8 @@ var runCmd = &cobra.Command{
 			Credentials:    creds,
 			DefaultEnvVars: cfg.DefaultEnvVars,
 			PublishPorts:   runPublishPorts,
+			HostPath:       hostPath,
+			LaunchCommand:  launchCommand,
 		}
 
 		if err := runner.Run(runConfig); err != nil {

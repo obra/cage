@@ -31,6 +31,17 @@ func GenerateLabels(projectName, worktreeName string) map[string]string {
 	}
 }
 
+// GenerateLabelsWithLaunchInfo creates Docker labels including host path and launch command
+func GenerateLabelsWithLaunchInfo(projectName, worktreeName, hostPath, launchCommand string) map[string]string {
+	return map[string]string{
+		"managed-by":               "packnplay",
+		"packnplay-project":        projectName,
+		"packnplay-worktree":       worktreeName,
+		"packnplay-host-path":      hostPath,
+		"packnplay-launch-command": launchCommand,
+	}
+}
+
 // LabelsToArgs converts label map to docker --label args
 func LabelsToArgs(labels map[string]string) []string {
 	args := make([]string, 0, len(labels)*2)

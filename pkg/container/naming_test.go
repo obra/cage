@@ -50,3 +50,32 @@ func TestGenerateLabels(t *testing.T) {
 		t.Errorf("packnplay-worktree label = %v, want feature-auth", labels["packnplay-worktree"])
 	}
 }
+
+func TestGenerateLabelsWithLaunchInfo(t *testing.T) {
+	hostPath := "/Users/jesse/myproject"
+	launchCommand := "packnplay run --worktree feature --env DEBUG=1 --git-creds claude code"
+
+	labels := GenerateLabelsWithLaunchInfo("myproject", "feature-auth", hostPath, launchCommand)
+
+	// Test existing labels still work
+	if labels["managed-by"] != "packnplay" {
+		t.Errorf("managed-by label = %v, want packnplay", labels["managed-by"])
+	}
+
+	if labels["packnplay-project"] != "myproject" {
+		t.Errorf("packnplay-project label = %v, want myproject", labels["packnplay-project"])
+	}
+
+	if labels["packnplay-worktree"] != "feature-auth" {
+		t.Errorf("packnplay-worktree label = %v, want feature-auth", labels["packnplay-worktree"])
+	}
+
+	// Test new labels
+	if labels["packnplay-host-path"] != hostPath {
+		t.Errorf("packnplay-host-path label = %v, want %v", labels["packnplay-host-path"], hostPath)
+	}
+
+	if labels["packnplay-launch-command"] != launchCommand {
+		t.Errorf("packnplay-launch-command label = %v, want %v", labels["packnplay-launch-command"], launchCommand)
+	}
+}
