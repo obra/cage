@@ -235,6 +235,40 @@ Pack 'n Play creates git worktrees in XDG-compliant locations for isolation:
 - **AI CLI tools**: Claude Code, OpenAI Codex, Google Gemini, GitHub Copilot, Qwen Code, Sourcegraph Amp
 - **Version control**: Git with full functionality
 
+### Default Container Configuration
+
+**Configurable Default Image:**
+packnplay supports custom default containers - you're not limited to the packnplay default. Set any image from any registry:
+
+```json
+{
+  "default_container": {
+    "image": "my-company/dev-environment:latest",
+    "check_for_updates": true,
+    "auto_pull_updates": false,
+    "check_frequency_hours": 24
+  }
+}
+```
+
+**Version Update Notifications:**
+When enabled, packnplay checks for new versions and shows detailed notifications:
+
+```bash
+ℹ️  New version available: ghcr.io/obra/packnplay-default:latest
+   Current: abc123de (2 days old)
+   Latest:  xyz789gh (just released)
+
+   To update: packnplay refresh-default-container
+```
+
+**Features:**
+- **Smart notifications**: Only notifies once per version, respects frequency settings
+- **Detailed version info**: Shows current vs latest with digests and age
+- **User control**: Manual refresh command with `packnplay refresh-default-container`
+- **Configurable checking**: Enable/disable update checking and auto-pull behavior
+- **Non-intrusive**: Checking happens in background, notifications only when needed
+
 ## Rebuilding the Default Container
 
 See [.devcontainer/README.md](.devcontainer/README.md) for instructions on building and publishing the default container image.

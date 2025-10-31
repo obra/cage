@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 
 	"github.com/charmbracelet/huh"
 )
@@ -66,6 +67,101 @@ func GetDefaultContainerConfig() DefaultContainerConfig {
 		AutoPullUpdates:     false,
 		CheckFrequencyHours: 24,
 	}
+}
+
+// VersionTrackingData persists notification history to avoid spam
+type VersionTrackingData struct {
+	LastCheck     time.Time                      `json:"last_check"`
+	Notifications map[string]VersionNotification `json:"notifications"`
+}
+
+// VersionNotification tracks when we notified about a specific image version
+type VersionNotification struct {
+	Digest     string    `json:"digest"`
+	NotifiedAt time.Time `json:"notified_at"`
+	ImageName  string    `json:"image_name"`
+}
+
+// GetVersionTrackingPath returns path to version tracking file
+func GetVersionTrackingPath() string {
+	configHome := os.Getenv("XDG_CONFIG_HOME")
+	if configHome == "" {
+		home, _ := os.UserHomeDir()
+		configHome = filepath.Join(home, ".config")
+	}
+	return filepath.Join(configHome, "packnplay", "version-tracking.json")
+}
+
+// SaveVersionTracking saves notification history to disk
+func SaveVersionTracking(data *VersionTrackingData, filePath string) error {
+	// Ensure directory exists
+	dir := filepath.Dir(filePath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
+	// Write data
+	jsonData, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return fmt.Errorf("failed to marshal tracking data: %w", err)
+	}
+
+	return os.WriteFile(filePath, jsonData, 0644)
+}
+
+// LoadVersionTracking loads notification history from disk
+func LoadVersionTracking(filePath string) (*VersionTrackingData, error) {
+	// Check if file exists
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		// Return empty tracking data
+		return &VersionTrackingData{
+			Notifications: make(map[string]VersionNotification),
+		}, nil
+	}
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read tracking file: %w", err)
+	}
+
+	var tracking VersionTrackingData
+	if err := json.Unmarshal(data, &tracking); err != nil {
+		return nil, fmt.Errorf("failed to parse tracking data: %w", err)
+	}
+
+	// Initialize map if nil
+	if tracking.Notifications == nil {
+		tracking.Notifications = make(map[string]VersionNotification)
+	}
+
+	return &tracking, nil
+}
+
+// shouldCheckForUpdates determines if we should check for updates based on config and timing
+func shouldCheckForUpdates(config DefaultContainerConfig, lastCheck time.Time) bool {
+	if !config.CheckForUpdates {
+		return false
+	}
+
+	checkFrequency := time.Duration(config.CheckFrequencyHours) * time.Hour
+	return time.Since(lastCheck) >= checkFrequency
+}
+
+// LoadOrDefault loads config or returns default config if loading fails
+func LoadOrDefault() (*Config, error) {
+	cfg, err := Load()
+	if err != nil {
+		// Return default config if loading fails
+		return &Config{
+			DefaultContainer: GetDefaultContainerConfig(),
+		}, nil
+	}
+	return cfg, nil
+}
+
+// ShouldCheckForUpdates is an alias for shouldCheckForUpdates for external use
+func ShouldCheckForUpdates(config DefaultContainerConfig, lastCheck time.Time) bool {
+	return shouldCheckForUpdates(config, lastCheck)
 }
 
 // GetConfigPath returns the path to the config file
