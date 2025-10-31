@@ -345,6 +345,25 @@ func createSettingsModal(existing *Config) *SettingsModal {
 				},
 			},
 		},
+		{
+			name:        "actions",
+			title:       "Actions",
+			description: "Save or cancel configuration changes",
+			fields: []SettingsField{
+				{
+					name:        "save",
+					fieldType:   "button",
+					title:       "Save Configuration",
+					description: "Save changes to config file",
+				},
+				{
+					name:        "cancel",
+					fieldType:   "button",
+					title:       "Cancel",
+					description: "Exit without saving changes",
+				},
+			},
+		},
 	}
 
 	return &SettingsModal{
@@ -485,7 +504,11 @@ func (m *SettingsModal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m = m.navigateDown()
 
 		case "enter", " ":
-			m = m.toggleCurrentField()
+			m = m.activateCurrentField()
+			// Check if button was pressed to quit
+			if m.saved || m.quitting {
+				return m, tea.Quit
+			}
 
 		case "s", "ctrl+s":
 			m.saved = true
@@ -533,8 +556,8 @@ func (m *SettingsModal) navigateDown() *SettingsModal {
 	return m
 }
 
-// toggleCurrentField toggles the current field value
-func (m *SettingsModal) toggleCurrentField() *SettingsModal {
+// activateCurrentField activates the current field (toggle, select, or button)
+func (m *SettingsModal) activateCurrentField() *SettingsModal {
 	if m.currentSection < 0 || m.currentSection >= len(m.sections) {
 		return m
 	}
@@ -563,6 +586,13 @@ func (m *SettingsModal) toggleCurrentField() *SettingsModal {
 			}
 			nextIndex := (currentIndex + 1) % len(field.options)
 			field.value = field.options[nextIndex]
+		}
+	case "button":
+		// Handle button actions
+		if field.name == "save" {
+			m.saved = true
+		} else if field.name == "cancel" {
+			m.quitting = true
 		}
 	}
 
@@ -611,7 +641,7 @@ func (m *SettingsModal) renderModal() string {
 
 // renderField renders a settings field with consistent formatting
 func (m *SettingsModal) renderField(field SettingsField, focused bool) string {
-	// Consistent indentation - no jumping
+	// Fixed indentation - cursor always takes same space
 	baseIndent := "    "
 	cursor := " "
 	if focused {
@@ -645,13 +675,31 @@ func (m *SettingsModal) renderField(field SettingsField, focused bool) string {
 			Foreground(lipgloss.Color("39")).
 			Bold(true).
 			Render(field.value.(string))
+	case "button":
+		if focused {
+			if field.name == "save" {
+				value = lipgloss.NewStyle().
+					Background(lipgloss.Color("34")).
+					Foreground(lipgloss.Color("15")).
+					Bold(true).
+					Render(" SAVE ")
+			} else {
+				value = lipgloss.NewStyle().
+					Background(lipgloss.Color("1")).
+					Foreground(lipgloss.Color("15")).
+					Bold(true).
+					Render(" CANCEL ")
+			}
+		} else {
+			value = ""
+		}
 	}
 
-	// Fixed layout with consistent spacing
-	line := fmt.Sprintf("%s%s %-40s %s", baseIndent, cursor, title, value)
+	// FIXED: Consistent character positions prevent jumping
+	line := fmt.Sprintf("%s%s%-40s %s", baseIndent, cursor, title, value)
 
-	// Add description if focused
-	if focused && field.description != "" {
+	// FIXED: Always show description, not just when focused
+	if field.description != "" {
 		descStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("240")).
 			Italic(true)
