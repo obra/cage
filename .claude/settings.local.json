@@ -72,7 +72,8 @@
       "Skill(superpowers:using-superpowers)",
       "Bash(/tmp/packnplay-test list:*)",
       "Bash(/tmp/packnplay-test run bash)",
-      "Bash(/tmp/packnplay-test run --invalid-flag bash)"
+      "Bash(/tmp/packnplay-test run --invalid-flag bash)",
+      "Bash(go get:*)"
     ],
     "deny": [],
     "ask": []
