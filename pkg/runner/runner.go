@@ -139,7 +139,9 @@ func Run(config *RunConfig) error {
 		return fmt.Errorf("failed to load devcontainer config: %w", err)
 	}
 	if devConfig == nil {
-		devConfig = devcontainer.GetDefaultConfig(config.DefaultImage)
+		// Use configured default image (supports custom default containers)
+		defaultImage := getConfiguredDefaultImage(config)
+		devConfig = devcontainer.GetDefaultConfig(defaultImage)
 	}
 
 	// Step 4: Initialize container client
@@ -720,22 +722,6 @@ func ensureImage(dockerClient *docker.Client, config *devcontainer.Config, proje
 			if err != nil {
 				return fmt.Errorf("failed to pull image %s: %w\nDocker output:\n%s", imageName, err, output)
 			}
-		} else {
-			// Image exists locally - check if we should update it
-			age, ageErr := getImageAge(dockerClient, imageName)
-			if ageErr == nil && shouldUpdateImage(imageName, age, false) {
-				if verbose {
-					fmt.Fprintf(os.Stderr, "Image %s is %v old, pulling latest version\n", imageName, age.Truncate(time.Hour))
-				}
-
-				_, err := dockerClient.Run("pull", imageName)
-				if err != nil {
-					// Don't fail the whole operation if update fails, just warn
-					fmt.Fprintf(os.Stderr, "Warning: failed to update image %s: %v\n", imageName, err)
-				} else if verbose {
-					fmt.Fprintf(os.Stderr, "Successfully updated %s\n", imageName)
-				}
-			}
 		}
 	}
 
@@ -961,86 +947,96 @@ func generateDirectoryCreationCommands(hostPath string) [][]string {
 	return commands
 }
 
-// getImageAge returns how long ago the image was created/pulled locally
-func getImageAge(dockerClient *docker.Client, imageName string) (time.Duration, error) {
-	// Get image creation date
-	output, err := dockerClient.Run("image", "inspect", "--format", "{{.Created}}", imageName)
-	if err != nil {
-		return 0, fmt.Errorf("failed to inspect image: %w", err)
-	}
-
-	// Parse the timestamp
-	created, err := time.Parse(time.RFC3339, strings.TrimSpace(output))
-	if err != nil {
-		return 0, fmt.Errorf("failed to parse image timestamp: %w", err)
-	}
-
-	return time.Since(created), nil
+// NotificationDecision represents whether to notify about a version update
+type NotificationDecision struct {
+	shouldNotify bool
+	reason       string
 }
 
-// shouldUpdateImage determines if an image should be updated based on age and policies
-func shouldUpdateImage(imageName string, age time.Duration, forceUpdate bool) bool {
-	if forceUpdate {
-		return true
+// shouldNotifyAboutVersion determines if user should be notified about version changes
+func shouldNotifyAboutVersion(currentDigest, remoteDigest string, lastNotified time.Time, frequency time.Duration) NotificationDecision {
+	if currentDigest == remoteDigest {
+		return NotificationDecision{false, "same version"}
 	}
 
-	// Only auto-update :latest images
-	if !strings.HasSuffix(imageName, ":latest") {
-		return false
+	if time.Since(lastNotified) < frequency {
+		return NotificationDecision{false, "recently notified"}
 	}
 
-	// Update if older than 24 hours
-	return age > 24*time.Hour
+	return NotificationDecision{true, "new version available"}
 }
 
-// ImageUpdateAction represents what action to take for an image
-type ImageUpdateAction struct {
-	action string // "use", "pull", "skip"
-	reason string
+// ImageVersionInfo holds version information about an image
+type ImageVersionInfo struct {
+	Digest  string
+	Created time.Time
+	Size    string
+	Tags    []string
 }
 
-// imageUpdateAction determines what action to take for an image
-func imageUpdateAction(imageName string, forceUpdate bool) ImageUpdateAction {
-	// Default action for missing image
-	return ImageUpdateAction{
-		action: "pull",
-		reason: "image not found locally",
+// AgeString returns a human-readable age string
+func (i *ImageVersionInfo) AgeString() string {
+	age := time.Since(i.Created)
+	if age < time.Hour {
+		return "just released"
+	}
+	if age < 24*time.Hour {
+		return fmt.Sprintf("%.0f hours old", age.Hours())
+	}
+	return fmt.Sprintf("%.0f days old", age.Hours()/24)
+}
+
+// ShortDigest returns first 8 characters of digest
+func (i *ImageVersionInfo) ShortDigest() string {
+	if len(i.Digest) < 8 {
+		return i.Digest
+	}
+	// Skip sha256: prefix if present
+	digest := i.Digest
+	if strings.HasPrefix(digest, "sha256:") {
+		digest = digest[7:]
+	}
+	if len(digest) >= 8 {
+		return digest[:8]
+	}
+	return digest
+}
+
+// VersionTracker tracks which image versions have been seen and notified
+type VersionTracker struct {
+	notifications map[string]time.Time // image:digest -> when notified
+}
+
+// NewVersionTracker creates a new version tracker
+func NewVersionTracker() *VersionTracker {
+	return &VersionTracker{
+		notifications: make(map[string]time.Time),
 	}
 }
 
-// RefreshDefaultContainer forces a pull of the default container image
-func RefreshDefaultContainer(verbose bool) error {
-	// Get default image name
-	defaultImage := "ghcr.io/obra/packnplay-default:latest"
-
-	dockerClient, err := docker.NewClient(verbose)
-	if err != nil {
-		return fmt.Errorf("failed to initialize docker: %w", err)
-	}
-
-	if verbose {
-		fmt.Printf("Pulling latest version of %s...\n", defaultImage)
-	}
-
-	output, err := dockerClient.Run("pull", defaultImage)
-	if err != nil {
-		return fmt.Errorf("failed to pull image %s: %w\nDocker output:\n%s", defaultImage, err, output)
-	}
-
-	if verbose {
-		fmt.Printf("Successfully updated %s\n", defaultImage)
-	} else {
-		fmt.Printf("Default container updated to latest version\n")
-	}
-
-	return nil
+// HasNotified returns true if we've notified about this image:digest combination
+func (vt *VersionTracker) HasNotified(image, digest string) bool {
+	key := image + ":" + digest
+	_, exists := vt.notifications[key]
+	return exists
 }
 
-// Helper function for tests
-func isImageNotFoundError(err error) bool {
-	return strings.Contains(err.Error(), "No such image") ||
-		   strings.Contains(err.Error(), "image not found")
+// MarkNotified marks that we've notified about this image:digest combination
+func (vt *VersionTracker) MarkNotified(image, digest string) {
+	key := image + ":" + digest
+	vt.notifications[key] = time.Now()
 }
+
+// getConfiguredDefaultImage returns the user's configured default image or fallback
+func getConfiguredDefaultImage(runConfig *RunConfig) string {
+	// For now, use the existing DefaultImage field
+	// TODO: This will be enhanced to use config.DefaultContainer.Image
+	if runConfig.DefaultImage != "" {
+		return runConfig.DefaultImage
+	}
+	return "ghcr.io/obra/packnplay-default:latest"
+}
+
 
 // getOrCreateContainerCredentialFile manages shared credential file for all containers
 func getOrCreateContainerCredentialFile(containerName string) (string, error) {

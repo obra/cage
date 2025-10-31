@@ -12,11 +12,20 @@ import (
 
 // Config represents packnplay's configuration
 type Config struct {
-	ContainerRuntime   string               `json:"container_runtime"` // docker, podman, or container
-	DefaultImage       string               `json:"default_image"`     // default container image to use
-	DefaultCredentials Credentials          `json:"default_credentials"`
-	DefaultEnvVars     []string             `json:"default_env_vars"` // API keys to always proxy
-	EnvConfigs         map[string]EnvConfig `json:"env_configs"`
+	ContainerRuntime   string                   `json:"container_runtime"` // docker, podman, or container
+	DefaultImage       string                   `json:"default_image"`     // deprecated: use DefaultContainer.Image
+	DefaultCredentials Credentials              `json:"default_credentials"`
+	DefaultEnvVars     []string                 `json:"default_env_vars"` // API keys to always proxy
+	EnvConfigs         map[string]EnvConfig     `json:"env_configs"`
+	DefaultContainer   DefaultContainerConfig   `json:"default_container"`
+}
+
+// DefaultContainerConfig configures the default container and update behavior
+type DefaultContainerConfig struct {
+	Image               string `json:"image"`                 // default container image to use
+	CheckForUpdates     bool   `json:"check_for_updates"`     // whether to check for new versions
+	AutoPullUpdates     bool   `json:"auto_pull_updates"`     // whether to auto-pull new versions
+	CheckFrequencyHours int    `json:"check_frequency_hours"` // how often to check for updates
 }
 
 // EnvConfig defines environment variables for different setups (API configs, etc.)
@@ -34,6 +43,29 @@ type Credentials struct {
 	GPG bool `json:"gpg"` // GPG keys for commit signing
 	NPM bool `json:"npm"` // npm credentials
 	AWS bool `json:"aws"` // AWS credentials
+}
+
+// GetDefaultImage returns the configured default image or fallback
+func (c *Config) GetDefaultImage() string {
+	if c.DefaultContainer.Image != "" {
+		return c.DefaultContainer.Image
+	}
+	// Fallback to old field for backward compatibility
+	if c.DefaultImage != "" {
+		return c.DefaultImage
+	}
+	// Ultimate fallback
+	return "ghcr.io/obra/packnplay-default:latest"
+}
+
+// GetDefaultContainerConfig returns the default configuration for DefaultContainer
+func GetDefaultContainerConfig() DefaultContainerConfig {
+	return DefaultContainerConfig{
+		Image:               "ghcr.io/obra/packnplay-default:latest",
+		CheckForUpdates:     true,
+		AutoPullUpdates:     false,
+		CheckFrequencyHours: 24,
+	}
 }
 
 // GetConfigPath returns the path to the config file

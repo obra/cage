@@ -5,9 +5,8 @@ import (
 )
 
 func TestRefreshCommand(t *testing.T) {
-	// Test that the refresh command exists and has proper help text
+	// Test that the refresh command exists and works with configurable default image
 
-	// The refresh command should be available
 	if refreshCmd == nil {
 		t.Error("refreshCmd should be defined")
 	}
@@ -22,9 +21,8 @@ func TestRefreshCommand(t *testing.T) {
 }
 
 func TestRefreshCommandFlags(t *testing.T) {
-	// Test that the refresh command has appropriate flags
+	// Test that refresh command has verbose flag
 
-	// Should have verbose flag for detailed output
 	flag := refreshCmd.Flags().Lookup("verbose")
 	if flag == nil {
 		t.Error("refresh command should have --verbose flag")
