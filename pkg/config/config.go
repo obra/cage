@@ -6,9 +6,11 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
-	"github.com/charmbracelet/huh"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 )
 
 // Config represents packnplay's configuration
@@ -250,149 +252,376 @@ func SaveConfig(cfg *Config, configPath string) error {
 	return os.WriteFile(configPath, data, 0644)
 }
 
-// createConfigurationForm creates a single-screen configuration form
-func createConfigurationForm(existing *Config) (*huh.Form, *ConfigFormData) {
-	// Detect available container runtimes
+// ConfigTUIModel represents the state of the configuration TUI
+type ConfigTUIModel struct {
+	config       *Config
+	configPath   string
+	currentField int
+	fields       []ConfigField
+	saved        bool
+	quitting     bool
+	width        int
+	height       int
+}
+
+// ConfigField represents a configurable field in the TUI
+type ConfigField struct {
+	name        string
+	fieldType   string // "select", "toggle"
+	title       string
+	description string
+	value       interface{}
+	options     []string // for select fields
+}
+
+// createConfigTUIModel creates a new configuration TUI model
+func createConfigTUIModel(existing *Config) *ConfigTUIModel {
+	// Detect available runtimes
 	available := detectAvailableRuntimes()
 
-	// Initialize form data with current values
-	formData := &ConfigFormData{
-		SelectedRuntime: existing.ContainerRuntime,
-		SSHCreds:       existing.DefaultCredentials.SSH,
-		GHCreds:        existing.DefaultCredentials.GH,
-		GPGCreds:       existing.DefaultCredentials.GPG,
-		NPMCreds:       existing.DefaultCredentials.NPM,
-		AWSCreds:       existing.DefaultCredentials.AWS,
+	fields := []ConfigField{
+		{
+			name:        "runtime",
+			fieldType:   "select",
+			title:       "🐳 Container Runtime",
+			description: "Choose which container CLI to use",
+			value:       existing.ContainerRuntime,
+			options:     available,
+		},
+		{
+			name:        "ssh",
+			fieldType:   "toggle",
+			title:       "🔐 SSH keys",
+			description: "Mount ~/.ssh (read-only) for SSH authentication",
+			value:       existing.DefaultCredentials.SSH,
+		},
+		{
+			name:        "github",
+			fieldType:   "toggle",
+			title:       "🐙 GitHub CLI credentials",
+			description: "Mount gh config for GitHub operations",
+			value:       existing.DefaultCredentials.GH,
+		},
+		{
+			name:        "gpg",
+			fieldType:   "toggle",
+			title:       "🔏 GPG credentials",
+			description: "Mount ~/.gnupg (read-only) for commit signing",
+			value:       existing.DefaultCredentials.GPG,
+		},
+		{
+			name:        "npm",
+			fieldType:   "toggle",
+			title:       "📦 npm credentials",
+			description: "Mount ~/.npmrc for authenticated npm operations",
+			value:       existing.DefaultCredentials.NPM,
+		},
+		{
+			name:        "aws",
+			fieldType:   "toggle",
+			title:       "☁️  AWS credentials",
+			description: "Mount ~/.aws and AWS environment variables",
+			value:       existing.DefaultCredentials.AWS,
+		},
 	}
 
-	// Set default runtime if not configured
-	if formData.SelectedRuntime == "" && len(available) > 0 {
-		formData.SelectedRuntime = available[0]
+	return &ConfigTUIModel{
+		config:       existing,
+		currentField: 0,
+		fields:       fields,
+		width:        80,
+		height:       24,
+	}
+}
+
+// getFieldCount returns number of configurable fields
+func (m *ConfigTUIModel) getFieldCount() int {
+	return len(m.fields)
+}
+
+// hasRuntimeField checks if model has runtime field
+func (m *ConfigTUIModel) hasRuntimeField() bool {
+	for _, field := range m.fields {
+		if field.name == "runtime" {
+			return true
+		}
+	}
+	return false
+}
+
+// hasCredentialFields checks if model has credential fields
+func (m *ConfigTUIModel) hasCredentialFields() bool {
+	credentialCount := 0
+	for _, field := range m.fields {
+		if field.fieldType == "toggle" {
+			credentialCount++
+		}
+	}
+	return credentialCount >= 5 // SSH, GH, GPG, npm, AWS
+}
+
+// moveDown navigates to next field
+func moveDown(model *ConfigTUIModel) *ConfigTUIModel {
+	model.currentField = (model.currentField + 1) % len(model.fields)
+	return model
+}
+
+// moveUp navigates to previous field
+func moveUp(model *ConfigTUIModel) *ConfigTUIModel {
+	model.currentField = (model.currentField - 1 + len(model.fields)) % len(model.fields)
+	return model
+}
+
+// findFieldIndex finds the index of a field by name
+func (m *ConfigTUIModel) findFieldIndex(name string) int {
+	for i, field := range m.fields {
+		if strings.Contains(field.name, strings.ToLower(name)) {
+			return i
+		}
+	}
+	return -1
+}
+
+// getFieldValue gets the value of a field by index
+func (m *ConfigTUIModel) getFieldValue(index int) interface{} {
+	if index < 0 || index >= len(m.fields) {
+		return nil
+	}
+	return m.fields[index].value
+}
+
+// toggleCurrentField toggles the current field (if it's a toggle)
+func toggleCurrentField(model *ConfigTUIModel) *ConfigTUIModel {
+	if model.currentField < 0 || model.currentField >= len(model.fields) {
+		return model
 	}
 
-	// Build runtime options
-	runtimeOptions := make([]huh.Option[string], len(available))
-	for i, rt := range available {
-		runtimeOptions[i] = huh.NewOption(rt, rt)
+	field := &model.fields[model.currentField]
+	if field.fieldType == "toggle" {
+		if val, ok := field.value.(bool); ok {
+			field.value = !val
+		}
 	}
 
-	// Create single group with ALL fields for single-screen navigation
-	form := huh.NewForm(
-		huh.NewGroup(
-			huh.NewNote().
-				Title("packnplay Configuration").
-				Description("Configure all settings on one screen. Use ↑/↓ to navigate."),
-
-			huh.NewSelect[string]().
-				Title("Container Runtime").
-				Description("Choose which container CLI to use").
-				Options(runtimeOptions...).
-				Value(&formData.SelectedRuntime),
-
-			huh.NewNote().
-				Title("Credentials").
-				Description("Choose which credentials to mount in containers by default"),
-
-			huh.NewConfirm().
-				Title("SSH keys").
-				Description("Mounts ~/.ssh (read-only) for SSH authentication").
-				Value(&formData.SSHCreds).
-				Affirmative("Yes").
-				Negative("No"),
-
-			huh.NewConfirm().
-				Title("GitHub CLI credentials").
-				Description("Mounts gh config for GitHub operations").
-				Value(&formData.GHCreds).
-				Affirmative("Yes").
-				Negative("No"),
-
-			huh.NewConfirm().
-				Title("GPG credentials").
-				Description("Mounts ~/.gnupg (read-only) for commit signing").
-				Value(&formData.GPGCreds).
-				Affirmative("Yes").
-				Negative("No"),
-
-			huh.NewConfirm().
-				Title("npm credentials").
-				Description("Mounts ~/.npmrc for authenticated npm operations").
-				Value(&formData.NPMCreds).
-				Affirmative("Yes").
-				Negative("No"),
-
-			huh.NewConfirm().
-				Title("AWS credentials").
-				Description("Mounts ~/.aws and AWS environment variables").
-				Value(&formData.AWSCreds).
-				Affirmative("Yes").
-				Negative("No"),
-		).WithHideFunc(func() bool { return false }), // Always show all fields
-	)
-
-	return form, formData
+	return model
 }
 
-// ConfigFormData holds form data for configuration
-type ConfigFormData struct {
-	SelectedRuntime string
-	SSHCreds       bool
-	GHCreds        bool
-	GPGCreds       bool
-	NPMCreds       bool
-	AWSCreds       bool
+// Init implements tea.Model
+func (m *ConfigTUIModel) Init() tea.Cmd {
+	return nil
 }
 
-// Helper functions for testing
-func getFormGroupCount(form *huh.Form) int {
-	// For testing - simplified implementation
-	return 1 // We know we're creating 1 group
+// Update implements tea.Model
+func (m *ConfigTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c", "q", "esc":
+			m.quitting = true
+			return m, tea.Quit
+
+		case "up", "k":
+			m = moveUp(m)
+
+		case "down", "j":
+			m = moveDown(m)
+
+		case "enter", " ":
+			// Toggle current field or cycle through options
+			if m.fields[m.currentField].fieldType == "toggle" {
+				m = toggleCurrentField(m)
+			} else if m.fields[m.currentField].fieldType == "select" {
+				// Cycle through select options
+				m = cycleSelectOption(m)
+			}
+
+		case "s", "ctrl+s":
+			// Save configuration
+			m.saved = true
+			return m, tea.Quit
+		}
+	}
+
+	return m, nil
 }
 
-func getFormFieldCount(form *huh.Form) int {
-	// For testing - simplified implementation
-	return 8 // 1 note + 1 select + 1 note + 5 confirms = 8 fields
+// View implements tea.Model
+func (m *ConfigTUIModel) View() string {
+	if m.quitting && !m.saved {
+		return "Configuration cancelled.\n"
+	}
+
+	if m.saved {
+		return "✅ Configuration saved!\n"
+	}
+
+	return m.renderView()
 }
 
-func hasOptimalLayout(form *huh.Form) bool {
-	// For testing - simplified implementation
-	return true // Assume our layout is optimal
+// cycleSelectOption cycles through options for select fields
+func cycleSelectOption(model *ConfigTUIModel) *ConfigTUIModel {
+	field := &model.fields[model.currentField]
+	if field.fieldType != "select" || len(field.options) == 0 {
+		return model
+	}
+
+	currentValue := field.value.(string)
+	currentIndex := 0
+	for i, option := range field.options {
+		if option == currentValue {
+			currentIndex = i
+			break
+		}
+	}
+
+	nextIndex := (currentIndex + 1) % len(field.options)
+	field.value = field.options[nextIndex]
+
+	return model
 }
 
-func showsCurrentValues(form *huh.Form, config *Config) bool {
-	// For testing - simplified implementation
-	return true // Our form shows current values as defaults
+// renderView renders the TUI view with proper layout
+func (m *ConfigTUIModel) renderView() string {
+	var lines []string
+
+	// Header
+	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("12"))
+	lines = append(lines, headerStyle.Render("⚙️  packnplay Configuration"))
+	lines = append(lines, "Use ↑/↓ arrows to navigate • Enter/Space to toggle • 's' to save • 'q' to cancel")
+	lines = append(lines, "")
+
+	// Runtime section
+	lines = append(lines, headerStyle.Render("🐳 Container Runtime"))
+	runtimeField := m.fields[0] // Runtime is always first
+	runtimeLine := m.renderSelectField(0, runtimeField)
+	lines = append(lines, runtimeLine)
+	lines = append(lines, "")
+
+	// Credentials section
+	lines = append(lines, headerStyle.Render("🔐 Credentials"))
+	for i := 1; i < len(m.fields); i++ { // Skip runtime field
+		field := m.fields[i]
+		if field.fieldType == "toggle" {
+			line := m.renderToggleField(i, field)
+			lines = append(lines, line)
+		}
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+// renderToggleField renders a toggle field with right-aligned toggle
+func (m *ConfigTUIModel) renderToggleField(index int, field ConfigField) string {
+	focused := index == m.currentField
+	value := field.value.(bool)
+
+	// Create base style
+	baseStyle := lipgloss.NewStyle().Width(m.width - 10)
+	if focused {
+		baseStyle = baseStyle.Foreground(lipgloss.Color("12")).Bold(true)
+	}
+
+	// Format toggle value
+	toggle := "[No]"
+	if value {
+		toggle = "[Yes]"
+	}
+
+	// Create line with title on left, toggle on right
+	title := field.title
+	description := field.description
+
+	line := fmt.Sprintf("%-45s %s", title, toggle)
+	if focused {
+		line = "▶ " + line
+		if description != "" {
+			line += "\n  " + description
+		}
+	}
+
+	return baseStyle.Render(line)
+}
+
+// renderSelectField renders a select field
+func (m *ConfigTUIModel) renderSelectField(index int, field ConfigField) string {
+	focused := index == m.currentField
+	value := field.value.(string)
+
+	baseStyle := lipgloss.NewStyle().Width(m.width - 10)
+	if focused {
+		baseStyle = baseStyle.Foreground(lipgloss.Color("12")).Bold(true)
+	}
+
+	line := fmt.Sprintf("%-45s [%s]", field.title, value)
+	if focused {
+		line = "▶ " + line
+		if field.description != "" {
+			line += "\n  " + field.description
+		}
+	}
+
+	return baseStyle.Render(line)
+}
+
+// runCustomConfigTUI runs the custom configuration TUI
+func runCustomConfigTUI(existing *Config, configPath string, verbose bool) error {
+	model := createConfigTUIModel(existing)
+	model.configPath = configPath
+
+	program := tea.NewProgram(model, tea.WithAltScreen())
+	finalModel, err := program.Run()
+	if err != nil {
+		return fmt.Errorf("TUI failed: %w", err)
+	}
+
+	// Check if user saved changes
+	if finalModel, ok := finalModel.(*ConfigTUIModel); ok && finalModel.saved {
+		// Apply safe config updates
+		return applySafeConfigUpdates(finalModel, configPath)
+	}
+
+	return nil // User cancelled
+}
+
+// applySafeConfigUpdates applies TUI changes to config file safely
+func applySafeConfigUpdates(model *ConfigTUIModel, configPath string) error {
+	// Extract values from TUI model
+	runtime := ""
+	creds := Credentials{Git: true} // Always copy .gitconfig
+
+	for _, field := range model.fields {
+		switch field.name {
+		case "runtime":
+			runtime = field.value.(string)
+		case "ssh":
+			creds.SSH = field.value.(bool)
+		case "github":
+			creds.GH = field.value.(bool)
+		case "gpg":
+			creds.GPG = field.value.(bool)
+		case "npm":
+			creds.NPM = field.value.(bool)
+		case "aws":
+			creds.AWS = field.value.(bool)
+		}
+	}
+
+	// Use safe update system
+	updates := ConfigUpdates{
+		ContainerRuntime:   &runtime,
+		DefaultCredentials: &creds,
+	}
+
+	return UpdateConfigSafely(configPath, updates)
 }
 
 // RunInteractiveConfiguration runs the interactive configuration flow, preserving existing settings
 func RunInteractiveConfiguration(existing *Config, configPath string, verbose bool) error {
-	// Create single-screen form with all options visible and navigable
-	form, formData := createConfigurationForm(existing)
-
-	err := form.Run()
-	if err != nil {
-		return fmt.Errorf("interactive configuration failed: %w", err)
-	}
-
-	// Apply updates safely using form data (preserves unshown settings)
-	updates := ConfigUpdates{
-		ContainerRuntime: &formData.SelectedRuntime,
-		DefaultCredentials: &Credentials{
-			Git: true, // Always copy .gitconfig (it's config, not credentials)
-			SSH: formData.SSHCreds,
-			GH:  formData.GHCreds,
-			GPG: formData.GPGCreds,
-			NPM: formData.NPMCreds,
-			AWS: formData.AWSCreds,
-		},
-	}
-
-	if err := UpdateConfigSafely(configPath, updates); err != nil {
-		return fmt.Errorf("failed to save configuration: %w", err)
-	}
-
-	fmt.Printf("\n✅ Configuration saved to %s\n", configPath)
-	return nil
+	return runCustomConfigTUI(existing, configPath, verbose)
 }
 
 // GetConfigPath returns the path to the config file
@@ -488,102 +717,11 @@ func Save(cfg *Config) error {
 	return nil
 }
 
-// interactiveSetup prompts user for credential configuration
+// interactiveSetup prompts user for credential configuration using custom TUI
 func interactiveSetup(configPath string) (*Config, error) {
-	fmt.Println("\n🔐 packnplay First Run Setup")
-	fmt.Println("Configure which credentials to mount in containers by default.")
-
-	// Detect available container runtimes
-	available := detectAvailableRuntimes()
-	if len(available) == 0 {
-		return nil, fmt.Errorf("no container runtime found (tried: docker, podman, container)")
-	}
-
-	var selectedRuntime string
-	var sshCreds, ghCreds, gpgCreds, npmCreds, awsCreds, saveConfig bool
-
-	// Set sensible defaults - SSH and auth credentials should be user choice
-	// Git config is just identity info, not credentials
-	saveConfig = true
-
-	// Build runtime selection options
-	runtimeOptions := make([]huh.Option[string], len(available))
-	for i, rt := range available {
-		runtimeOptions[i] = huh.NewOption(rt, rt)
-	}
-
-	form := huh.NewForm(
-		// First group: Select container runtime
-		huh.NewGroup(
-			huh.NewSelect[string]().
-				Title("Select container runtime").
-				Description("Choose which container CLI to use").
-				Options(runtimeOptions...).
-				Value(&selectedRuntime),
-		),
-		// Second group: Credentials (SSH and auth tokens only)
-		huh.NewGroup(
-			huh.NewConfirm().
-				Title("Enable SSH keys?").
-				Description("Mounts ~/.ssh (read-only) for SSH authentication to servers and repos").
-				Value(&sshCreds).
-				Affirmative("Yes").
-				Negative("No"),
-
-			huh.NewConfirm().
-				Title("Enable GitHub CLI credentials?").
-				Description("Mounts gh config for authenticated GitHub operations").
-				Value(&ghCreds).
-				Affirmative("Yes").
-				Negative("No"),
-
-			huh.NewConfirm().
-				Title("Enable GPG credentials?").
-				Description("Mounts ~/.gnupg (read-only) for commit signing").
-				Value(&gpgCreds).
-				Affirmative("Yes").
-				Negative("No"),
-
-			huh.NewConfirm().
-				Title("Enable npm credentials?").
-				Description("Mounts ~/.npmrc for authenticated npm operations").
-				Value(&npmCreds).
-				Affirmative("Yes").
-				Negative("No"),
-
-			huh.NewConfirm().
-				Title("Enable AWS credentials?").
-				Description("Mounts ~/.aws and passes AWS environment variables (supports SSO, credential_process, static)").
-				Value(&awsCreds).
-				Affirmative("Yes").
-				Negative("No"),
-		),
-		huh.NewGroup(
-			huh.NewConfirm().
-				Title("Save as defaults?").
-				Description(fmt.Sprintf("Save to %s", configPath)).
-				Value(&saveConfig).
-				Affirmative("Yes").
-				Negative("No"),
-		),
-	)
-
-	err := form.Run()
-	if err != nil {
-		return nil, fmt.Errorf("interactive setup failed: %w", err)
-	}
-
-	cfg := &Config{
-		ContainerRuntime: selectedRuntime,
-		DefaultImage:     "ghcr.io/obra/packnplay-default:latest",
-		DefaultCredentials: Credentials{
-			Git: true, // Always copy .gitconfig (it's config, not credentials)
-			SSH: sshCreds,
-			GH:  ghCreds,
-			GPG: gpgCreds,
-			NPM: npmCreds,
-			AWS: awsCreds,
-		},
+	// Create empty config for first-time setup
+	emptyConfig := &Config{
+		DefaultContainer: GetDefaultContainerConfig(),
 		DefaultEnvVars: []string{
 			"ANTHROPIC_API_KEY",
 			"OPENAI_API_KEY",
@@ -599,16 +737,14 @@ func interactiveSetup(configPath string) (*Config, error) {
 		EnvConfigs: make(map[string]EnvConfig),
 	}
 
-	if saveConfig {
-		if err := Save(cfg); err != nil {
-			return nil, err
-		}
-		fmt.Printf("\n✓ Configuration saved to %s\n", configPath)
-	} else {
-		fmt.Println("\n✓ Using one-time configuration (not saved)")
+	// Run custom TUI for first-time setup
+	err := runCustomConfigTUI(emptyConfig, configPath, false)
+	if err != nil {
+		return nil, fmt.Errorf("interactive setup failed: %w", err)
 	}
 
-	return cfg, nil
+	// Load the saved config
+	return LoadConfigFromFile(configPath)
 }
 
 // detectAvailableRuntimes finds which container runtimes are installed
