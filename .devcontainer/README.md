@@ -1,22 +1,39 @@
-# packnplay Default Dev Container
+# packnplay Batteries-Included Dev Container
 
-This is the default dev container used by packnplay when a project doesn't have its own `.devcontainer/devcontainer.json`.
+This is the default dev container used by packnplay when a project doesn't have its own `.devcontainer/devcontainer.json`. It provides a comprehensive agentic development environment.
 
 ## What's Included
 
-- Microsoft devcontainer base (Ubuntu)
-- Node.js LTS
-- GitHub CLI (`gh`)
-- AI CLI tools (npm global packages):
-  - `@anthropic-ai/claude-code` - Claude Code CLI
-  - `@openai/codex` - OpenAI Codex CLI
-  - `@google/gemini-cli` - Google Gemini CLI
-  - `@github/copilot` - GitHub Copilot CLI
-  - `@qwen-code/qwen-code` - Qwen Code CLI
-  - `@sourcegraph/amp` - Sourcegraph Amp CLI
-- Cursor CLI (`cursor-agent`) - Installed via curl
-- Git and common utilities
+### 🗣️ Programming Languages & Runtimes
+- **Node.js LTS** + npm - JavaScript/TypeScript development
+- **Python 3.11+** + **uv** - Modern fast Python package management
+- **Go latest** - CLI tools, backend development
+- **Rust latest** - Systems programming, modern tools
+
+### ☁️ Cloud CLIs (Multi-Architecture)
+- **AWS CLI** - Amazon Web Services management
+- **Azure CLI** - Microsoft cloud services
+- **Google Cloud CLI** - Google Cloud Platform
+
+### 🔧 Development Utilities
+- **jq/yq** - JSON/YAML processing (essential for APIs)
+- **curl/wget** - HTTP requests and downloads
+- **vim/nano** - Text editing
+- **make** - Build automation
+- **build-essential** - Compilers and build tools
+- **GitHub CLI (gh)** - GitHub workflows
+
+### 🤖 AI CLI Tools
+- `@anthropic-ai/claude-code` - Claude Code CLI
+- `@openai/codex` - OpenAI Codex CLI
+- `@google/gemini-cli` - Google Gemini CLI
+- `@github/copilot` - GitHub Copilot CLI
+- `@qwen-code/qwen-code` - Qwen Code CLI
+- `@sourcegraph/amp` - Sourcegraph Amp CLI
+
+### 👤 User Configuration
 - User: `vscode` (UID 1000)
+- All tools properly configured in PATH
 
 ## Building the Image
 
