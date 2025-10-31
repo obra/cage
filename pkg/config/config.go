@@ -259,6 +259,8 @@ type SettingsModal struct {
 	sections       []SettingsSection
 	currentSection int
 	currentField   int
+	buttonFocused  bool   // Are we focused on buttons (not fields)?
+	currentButton  int    // Which button is focused (0=save, 1=cancel)
 	saved          bool
 	quitting       bool
 	width          int
@@ -342,25 +344,6 @@ func createSettingsModal(existing *Config) *SettingsModal {
 					title:       "AWS credentials",
 					description: "Mount ~/.aws and AWS environment variables",
 					value:       existing.DefaultCredentials.AWS,
-				},
-			},
-		},
-		{
-			name:        "actions",
-			title:       "Actions",
-			description: "Save or cancel configuration changes",
-			fields: []SettingsField{
-				{
-					name:        "save",
-					fieldType:   "button",
-					title:       "Save Configuration",
-					description: "Save changes to config file",
-				},
-				{
-					name:        "cancel",
-					fieldType:   "button",
-					title:       "Cancel",
-					description: "Exit without saving changes",
 				},
 			},
 		},
@@ -498,16 +481,46 @@ func (m *SettingsModal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case "up", "k":
-			m = m.navigateUp()
+			if m.buttonFocused {
+				if m.currentButton > 0 {
+					m.currentButton--
+				} else {
+					// Move back to last field
+					m.buttonFocused = false
+					m.currentSection = len(m.sections) - 1
+					m.currentField = len(m.sections[m.currentSection].fields) - 1
+				}
+			} else {
+				m = m.navigateUp()
+			}
 
 		case "down", "j":
-			m = m.navigateDown()
+			if m.buttonFocused {
+				if m.currentButton < 1 {
+					m.currentButton++
+				}
+			} else {
+				m = m.navigateDown()
+				// Check if we've reached the end of all sections
+				if m.currentSection == 0 && m.currentField == 0 {
+					// We've wrapped around - move to buttons instead
+					m.buttonFocused = true
+					m.currentButton = 0
+				}
+			}
 
 		case "enter", " ":
-			m = m.activateCurrentField()
-			// Check if button was pressed to quit
-			if m.saved || m.quitting {
-				return m, tea.Quit
+			if m.buttonFocused {
+				// Handle button actions
+				if m.currentButton == 0 { // Save
+					m.saved = true
+					return m, tea.Quit
+				} else { // Cancel
+					m.quitting = true
+					return m, tea.Quit
+				}
+			} else {
+				m = m.activateCurrentField()
 			}
 
 		case "s", "ctrl+s":
@@ -550,8 +563,15 @@ func (m *SettingsModal) navigateUp() *SettingsModal {
 func (m *SettingsModal) navigateDown() *SettingsModal {
 	m.currentField++
 	if m.currentField >= len(m.sections[m.currentSection].fields) {
-		m.currentField = 0
-		m.currentSection = (m.currentSection + 1) % len(m.sections)
+		// Move to next section
+		if m.currentSection < len(m.sections)-1 {
+			m.currentSection++
+			m.currentField = 0
+		} else {
+			// We're at the end of all sections - move to buttons
+			m.buttonFocused = true
+			m.currentButton = 0
+		}
 	}
 	return m
 }
@@ -587,13 +607,7 @@ func (m *SettingsModal) activateCurrentField() *SettingsModal {
 			nextIndex := (currentIndex + 1) % len(field.options)
 			field.value = field.options[nextIndex]
 		}
-	case "button":
-		// Handle button actions
-		if field.name == "save" {
-			m.saved = true
-		} else if field.name == "cancel" {
-			m.quitting = true
-		}
+	// Remove button handling from field activation - buttons are separate now
 	}
 
 	return m
@@ -675,24 +689,6 @@ func (m *SettingsModal) renderField(field SettingsField, focused bool) string {
 			Foreground(lipgloss.Color("39")).
 			Bold(true).
 			Render(field.value.(string))
-	case "button":
-		if focused {
-			if field.name == "save" {
-				value = lipgloss.NewStyle().
-					Background(lipgloss.Color("34")).
-					Foreground(lipgloss.Color("15")).
-					Bold(true).
-					Render(" SAVE ")
-			} else {
-				value = lipgloss.NewStyle().
-					Background(lipgloss.Color("1")).
-					Foreground(lipgloss.Color("15")).
-					Bold(true).
-					Render(" CANCEL ")
-			}
-		} else {
-			value = ""
-		}
 	}
 
 	// FIXED: Use fixed-width title to ensure right-alignment stays consistent
@@ -715,28 +711,52 @@ func (m *SettingsModal) renderButtonBar() string {
 	separator := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("240")).
 		Width(m.width).
-		Render(strings.Repeat("─", m.width-4))
+		Render(strings.Repeat("─", 60))
 
-	// Button styling
-	saveButton := lipgloss.NewStyle().
-		Background(lipgloss.Color("34")).
-		Foreground(lipgloss.Color("15")).
+	// Button styling based on focus
+	saveStyle := lipgloss.NewStyle().
 		Padding(0, 2).
-		Bold(true).
-		Render(" Save ")
+		Bold(true)
+	cancelStyle := lipgloss.NewStyle().
+		Padding(0, 2)
 
-	cancelButton := lipgloss.NewStyle().
-		Background(lipgloss.Color("240")).
-		Foreground(lipgloss.Color("15")).
-		Padding(0, 2).
-		Render(" Cancel ")
+	if m.buttonFocused && m.currentButton == 0 {
+		// Save button focused
+		saveStyle = saveStyle.
+			Background(lipgloss.Color("34")).
+			Foreground(lipgloss.Color("15"))
+		cancelStyle = cancelStyle.
+			Foreground(lipgloss.Color("240"))
+	} else if m.buttonFocused && m.currentButton == 1 {
+		// Cancel button focused
+		saveStyle = saveStyle.
+			Foreground(lipgloss.Color("240"))
+		cancelStyle = cancelStyle.
+			Background(lipgloss.Color("1")).
+			Foreground(lipgloss.Color("15")).
+			Bold(true)
+	} else {
+		// No button focused
+		saveStyle = saveStyle.
+			Foreground(lipgloss.Color("240"))
+		cancelStyle = cancelStyle.
+			Foreground(lipgloss.Color("240"))
+	}
 
-	buttons := fmt.Sprintf("%s    %s", saveButton, cancelButton)
+	saveButton := saveStyle.Render(" Save ")
+	cancelButton := cancelStyle.Render(" Cancel ")
+
+	buttons := fmt.Sprintf("    %s    %s", saveButton, cancelButton)
+
+	helpText := "Press Enter to activate • 's' save • 'q' cancel • ↑/↓ navigate"
+	if m.buttonFocused {
+		helpText = "Press Enter to activate button • ↑/↓ navigate • 'q' cancel"
+	}
 
 	return separator + "\n" + buttons + "\n\n" +
 		lipgloss.NewStyle().
 			Foreground(lipgloss.Color("240")).
-			Render("Press 's' to save • 'q' to cancel • ↑/↓ to navigate")
+			Render(helpText)
 }
 
 // RunInteractiveConfiguration runs the interactive configuration flow, preserving existing settings
