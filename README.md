@@ -341,6 +341,22 @@ packnplay mounts your project at the **exact same path** inside the container as
 
 ## Configuration
 
+### Interactive Configuration
+
+**Reconfigure packnplay safely:**
+```bash
+packnplay configure                    # Edit all settings
+packnplay configure --section=runtime      # Just container runtime
+packnplay configure --section=credentials  # Just credential settings
+packnplay configure --section=container    # Just default container settings
+```
+
+**Safe Editing:**
+- ✅ **Preserves custom settings** not shown in UI (env configs, advanced settings)
+- ✅ **Shows current values** as defaults in forms
+- ✅ **Granular sections** - edit only what you need
+- ✅ **No data loss** - manual edits and version tracking are preserved
+
 ### Config File
 
 `~/.config/packnplay/config.json` (XDG-compliant):
