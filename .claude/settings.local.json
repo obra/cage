@@ -68,7 +68,11 @@
       "Bash(git -C /workspace status)",
       "Bash(git -C /workspace diff pkg/runner/runner.go)",
       "Bash(docker pull:*)",
-      "mcp__private-journal__process_thoughts"
+      "mcp__private-journal__process_thoughts",
+      "Skill(superpowers:using-superpowers)",
+      "Bash(/tmp/packnplay-test list:*)",
+      "Bash(/tmp/packnplay-test run bash)",
+      "Bash(/tmp/packnplay-test run --invalid-flag bash)"
     ],
     "deny": [],
     "ask": []

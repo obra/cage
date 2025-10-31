@@ -39,6 +39,8 @@ var runCmd = &cobra.Command{
 	Short: "Run command in container",
 	Long:  `Start a container and execute the specified command inside it.`,
 	Args:  cobra.MinimumNArgs(1),
+	SilenceUsage:  true,
+	SilenceErrors: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Ensure credential watcher is running (auto-managed daemon)
 		if err := ensureCredentialWatcher(); err != nil {
@@ -156,8 +158,10 @@ var runCmd = &cobra.Command{
 		}
 
 		if err := runner.Run(runConfig); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return err
+			// Print error without extra formatting since our error messages are already well-formatted
+			fmt.Fprintln(os.Stderr, err.Error())
+			// Return non-nil error to set exit code, but silence Cobra error handling
+			os.Exit(1)
 		}
 
 		return nil

@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
@@ -32,6 +33,16 @@ type RunConfig struct {
 	PublishPorts   []string // Port mappings to publish to host
 	HostPath       string   // Host directory path for the container
 	LaunchCommand  string   // Original command line used to launch
+}
+
+// ContainerDetails holds detailed information about a running container
+type ContainerDetails struct {
+	Names         string
+	Status        string
+	Project       string
+	Worktree      string
+	HostPath      string
+	LaunchCommand string
 }
 
 func Run(config *RunConfig) error {
@@ -159,12 +170,14 @@ func Run(config *RunConfig) error {
 	} else if isRunning {
 		// Container is running - check if user wants to reconnect
 		if !config.Reconnect {
-			// Error with helpful message
-			worktreeFlag := ""
-			if worktreeName != "no-worktree" {
-				worktreeFlag = fmt.Sprintf(" --worktree=%s", worktreeName)
+			// Get detailed container information
+			details, err := getContainerDetails(dockerClient, containerName)
+			if err != nil {
+				// Fallback to basic error if we can't get details
+				return fmt.Errorf("container already running for this worktree (unable to get details: %v)", err)
 			}
 
+			// Build command string
 			var cmdStr strings.Builder
 			for i, arg := range config.Command {
 				if i > 0 {
@@ -177,13 +190,47 @@ func Run(config *RunConfig) error {
 				}
 			}
 
-			return fmt.Errorf(`container already running for this worktree
+			// Determine current working directory
+			currentDir, err := os.Getwd()
+			if err != nil {
+				currentDir = ""
+			} else {
+				// Make absolute for comparison
+				currentDir, _ = filepath.Abs(currentDir)
+			}
 
-To run your command in the existing container:
-  packnplay run%s --reconnect %s
+			// Determine if we need worktree flag (if current dir doesn't match container's host path)
+			needWorktreeFlag := true
+			if currentDir != "" && details.HostPath != "" {
+				// If current directory matches container's host path, we don't need --worktree
+				needWorktreeFlag = currentDir != details.HostPath
+			}
 
-To stop the existing container:
-  packnplay stop%s`, worktreeFlag, cmdStr.String(), worktreeFlag)
+			worktreeFlag := ""
+			if needWorktreeFlag && worktreeName != "no-worktree" {
+				worktreeFlag = fmt.Sprintf(" --worktree=%s", worktreeName)
+			}
+
+			// Build detailed error message
+			errorMsg := fmt.Sprintf("container already running for this worktree\n\n")
+			errorMsg += fmt.Sprintf("Container Details:\n")
+			errorMsg += fmt.Sprintf("  Name: %s\n", details.Names)
+			errorMsg += fmt.Sprintf("  Status: %s\n", details.Status)
+			errorMsg += fmt.Sprintf("  Project: %s\n", details.Project)
+			errorMsg += fmt.Sprintf("  Worktree: %s\n", details.Worktree)
+			if details.HostPath != "" {
+				errorMsg += fmt.Sprintf("  Host Path: %s\n", details.HostPath)
+			}
+			if details.LaunchCommand != "" {
+				errorMsg += fmt.Sprintf("  Original Command: %s\n", details.LaunchCommand)
+			}
+
+			errorMsg += fmt.Sprintf("\nTo run your command in the existing container:\n")
+			errorMsg += fmt.Sprintf("  packnplay run%s --reconnect %s\n", worktreeFlag, cmdStr.String())
+			errorMsg += fmt.Sprintf("\nTo stop the existing container:\n")
+			errorMsg += fmt.Sprintf("  packnplay stop%s", worktreeFlag)
+
+			return fmt.Errorf(errorMsg)
 		}
 
 		// User explicitly wants to reconnect
@@ -704,6 +751,75 @@ func containerIsRunning(dockerClient *docker.Client, name string) (bool, error) 
 
 	// Docker/Podman - simple name matching
 	return strings.TrimSpace(output) == name, nil
+}
+
+// getContainerDetails gets detailed information about a container
+func getContainerDetails(dockerClient *docker.Client, name string) (*ContainerDetails, error) {
+	// Get container information using docker ps with JSON format
+	output, err := dockerClient.Run(
+		"ps",
+		"--filter", fmt.Sprintf("name=%s", name),
+		"--format", "{{json .}}",
+	)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get container details: %w", err)
+	}
+
+	if strings.TrimSpace(output) == "" {
+		return nil, fmt.Errorf("container not found")
+	}
+
+	// Parse the JSON output (should be one line)
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	if len(lines) == 0 {
+		return nil, fmt.Errorf("no container information found")
+	}
+
+	// Parse the first (and should be only) line
+	var containerInfo struct {
+		Names  string `json:"Names"`
+		Status string `json:"Status"`
+		Labels string `json:"Labels"`
+	}
+
+	if err := json.Unmarshal([]byte(lines[0]), &containerInfo); err != nil {
+		return nil, fmt.Errorf("failed to parse container info: %w", err)
+	}
+
+	// Parse labels to get detailed information
+	project, worktree, hostPath, launchCommand := parseLabelsFromString(containerInfo.Labels)
+
+	return &ContainerDetails{
+		Names:         containerInfo.Names,
+		Status:        containerInfo.Status,
+		Project:       project,
+		Worktree:      worktree,
+		HostPath:      hostPath,
+		LaunchCommand: launchCommand,
+	}, nil
+}
+
+// parseLabelsFromString parses Docker labels string format
+func parseLabelsFromString(labels string) (project, worktree, hostPath, launchCommand string) {
+	// Labels format: "label1=value1,label2=value2"
+	pairs := strings.Split(labels, ",")
+	for _, pair := range pairs {
+		if equalIdx := strings.Index(pair, "="); equalIdx != -1 {
+			key := pair[:equalIdx]
+			value := pair[equalIdx+1:]
+			switch key {
+			case "packnplay-project":
+				project = value
+			case "packnplay-worktree":
+				worktree = value
+			case "packnplay-host-path":
+				hostPath = value
+			case "packnplay-launch-command":
+				launchCommand = value
+			}
+		}
+	}
+	return
 }
 
 // getContainerID gets the container ID by name
