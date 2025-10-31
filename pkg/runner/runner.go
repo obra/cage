@@ -250,12 +250,12 @@ func Run(config *RunConfig) error {
 			return fmt.Errorf("failed to find docker command: %w", err)
 		}
 
-		// Always use /workspace as working directory
+		// Use host path as working directory
 		execArgs := []string{
 			filepath.Base(cmdPath),
 			"exec",
 			"-it",
-			"-w", "/workspace",
+			"-w", workDir, // Use resolved host path
 			containerID,
 		}
 		execArgs = append(execArgs, config.Command...)
@@ -347,8 +347,11 @@ func Run(config *RunConfig) error {
 		args = append(args, "-v", fmt.Sprintf("%s:/home/%s/.claude/.credentials.json", credentialFile, devConfig.RemoteUser))
 	}
 
-	// Mount workspace at /workspace
-	args = append(args, "-v", fmt.Sprintf("%s:/workspace", mountPath))
+	// Ensure parent directory exists in container by creating it on first run
+	// We'll create it after container starts but before exec
+
+	// Mount workspace at host path (preserving absolute paths)
+	args = append(args, "-v", fmt.Sprintf("%s:%s", mountPath, mountPath))
 
 	// Mount AI agent config directories if they exist
 	agentConfigDirs := []string{".codex", ".gemini", ".copilot", ".qwen", ".cursor", ".deepseek"}
@@ -519,9 +522,9 @@ func Run(config *RunConfig) error {
 		}
 	}
 
-	workingDir := "/workspace"
+	workingDir := mountPath
 
-	// Set working directory
+	// Set working directory to host path
 	args = append(args, "-w", workingDir)
 
 	// Add environment variables
@@ -620,7 +623,20 @@ func Run(config *RunConfig) error {
 	}
 	containerID = strings.TrimSpace(containerID)
 
-	// Step 10: Copy config files into container
+	// Step 10: Ensure host directory structure exists in container
+	dirCommands := generateDirectoryCreationCommands(mountPath)
+	for _, dirCmd := range dirCommands {
+		if config.Verbose {
+			fmt.Fprintf(os.Stderr, "Creating directory structure: %v\n", dirCmd)
+		}
+		_, err := dockerClient.Run(append([]string{"exec", containerID}, dirCmd...)...)
+		if err != nil {
+			_, _ = dockerClient.Run("rm", "-f", containerID)
+			return fmt.Errorf("failed to create directory structure: %w", err)
+		}
+	}
+
+	// Step 11: Copy config files into container
 
 	// Copy ~/.claude.json
 	claudeConfigSrc := filepath.Join(homeDir, ".claude.json")
@@ -654,7 +670,7 @@ func Run(config *RunConfig) error {
 		filepath.Base(cmdPath),
 		"exec",
 		"-it",
-		"-w", workingDir,
+		"-w", workingDir, // Now uses host path
 		containerID,
 	}
 	execArgs = append(execArgs, config.Command...)
@@ -873,6 +889,59 @@ func getFileSize(path string) int64 {
 		return stat.Size()
 	}
 	return 0
+}
+
+// generateMountArguments creates Docker mount arguments for host path preservation
+func generateMountArguments(config *RunConfig, projectName, worktreeName string) []string {
+	var args []string
+
+	// Mount at host path, not /workspace
+	hostPath := config.HostPath
+	if hostPath == "" {
+		hostPath = config.Path
+	}
+
+	// Add mount argument: -v hostPath:hostPath
+	args = append(args, "-v", fmt.Sprintf("%s:%s", hostPath, hostPath))
+
+	return args
+}
+
+// getWorkingDirectory returns the working directory that should be used in the container
+func getWorkingDirectory(config *RunConfig) string {
+	// Use host path as working directory, not /workspace
+	if config.HostPath != "" {
+		return config.HostPath
+	}
+	if config.Path != "" {
+		return config.Path
+	}
+	return "/workspace" // fallback
+}
+
+// generateExecArguments creates exec arguments with host path working directory
+func generateExecArguments(containerID string, command []string, workingDir string) []string {
+	args := []string{
+		"exec",
+		"-it",
+		"-w", workingDir, // Use host path, not /workspace
+		containerID,
+	}
+	args = append(args, command...)
+	return args
+}
+
+// generateDirectoryCreationCommands creates commands to set up directory structure in container
+func generateDirectoryCreationCommands(hostPath string) [][]string {
+	var commands [][]string
+
+	// Create parent directories in container
+	parentDir := filepath.Dir(hostPath)
+	if parentDir != "/" && parentDir != "." {
+		commands = append(commands, []string{"mkdir", "-p", parentDir})
+	}
+
+	return commands
 }
 
 // getOrCreateContainerCredentialFile manages shared credential file for all containers

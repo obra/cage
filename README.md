@@ -260,7 +260,7 @@ On first run, packnplay prompts you to choose which credentials to enable by def
 
 - `~/.claude` → mounted read-write (skills, plugins, history)
 - `~/.claude.json` → copied into container (avoids file lock conflicts)
-- Worktree → mounted at `/workspace`
+- Worktree → mounted at same host path (preserves absolute paths)
 - Main repo `.git` → mounted at its real path (git commands work)
 
 ### Environment Variables
