@@ -482,24 +482,16 @@ func (m *SettingsModal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		case "up", "k":
 			if m.buttonFocused {
-				if m.currentButton > 0 {
-					m.currentButton--
-				} else {
-					// Move back to last field
-					m.buttonFocused = false
-					m.currentSection = len(m.sections) - 1
-					m.currentField = len(m.sections[m.currentSection].fields) - 1
-				}
+				// Move back to last field from buttons
+				m.buttonFocused = false
+				m.currentSection = len(m.sections) - 1
+				m.currentField = len(m.sections[m.currentSection].fields) - 1
 			} else {
 				m = m.navigateUp()
 			}
 
 		case "down", "j":
-			if m.buttonFocused {
-				if m.currentButton < 1 {
-					m.currentButton++
-				}
-			} else {
+			if !m.buttonFocused {
 				m = m.navigateDown()
 				// Check if we've reached the end of all sections
 				if m.currentSection == 0 && m.currentField == 0 {
@@ -507,6 +499,16 @@ func (m *SettingsModal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.buttonFocused = true
 					m.currentButton = 0
 				}
+			}
+
+		case "left", "h":
+			if m.buttonFocused && m.currentButton > 0 {
+				m.currentButton--
+			}
+
+		case "right", "l":
+			if m.buttonFocused && m.currentButton < 1 {
+				m.currentButton++
 			}
 
 		case "enter", " ":
@@ -750,7 +752,7 @@ func (m *SettingsModal) renderButtonBar() string {
 
 	helpText := "Press Enter to activate • 's' save • 'q' cancel • ↑/↓ navigate"
 	if m.buttonFocused {
-		helpText = "Press Enter to activate button • ↑/↓ navigate • 'q' cancel"
+		helpText = "Press Enter to activate • ←/→ select button • ↑ back to fields"
 	}
 
 	return separator + "\n" + buttons + "\n\n" +
