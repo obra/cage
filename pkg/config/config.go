@@ -641,11 +641,11 @@ func (m *SettingsModal) renderModal() string {
 
 // renderField renders a settings field with consistent formatting
 func (m *SettingsModal) renderField(field SettingsField, focused bool) string {
-	// Fixed indentation - cursor always takes same space
-	baseIndent := "    "
-	cursor := " "
+	// Fixed indentation - cursor always takes exactly same space
+	baseIndent := "   " // 3 spaces
+	cursor := " "       // 1 space when not focused
 	if focused {
-		cursor = ">"
+		cursor = ">"    // 1 character when focused
 	}
 
 	// Title styling
