@@ -95,8 +95,8 @@ func TestConfigTUILayout(t *testing.T) {
 		t.Error("View should show current runtime value")
 	}
 
-	// Should have right-aligned toggles (look for Yes/No at end of lines)
-	if !containsText(view, "[Yes]") || !containsText(view, "[No]") {
+	// Should have right-aligned colored toggles
+	if !containsText(view, "ON") || !containsText(view, "OFF") {
 		t.Error("View should contain right-aligned toggle indicators")
 	}
 }

@@ -283,7 +283,7 @@ func createConfigTUIModel(existing *Config) *ConfigTUIModel {
 		{
 			name:        "runtime",
 			fieldType:   "select",
-			title:       "🐳 Container Runtime",
+			title:       "Container Runtime",
 			description: "Choose which container CLI to use",
 			value:       existing.ContainerRuntime,
 			options:     available,
@@ -291,48 +291,48 @@ func createConfigTUIModel(existing *Config) *ConfigTUIModel {
 		{
 			name:        "ssh",
 			fieldType:   "toggle",
-			title:       "🔐 SSH keys",
+			title:       "SSH keys",
 			description: "Mount ~/.ssh (read-only) for SSH authentication",
 			value:       existing.DefaultCredentials.SSH,
 		},
 		{
 			name:        "github",
 			fieldType:   "toggle",
-			title:       "🐙 GitHub CLI credentials",
+			title:       "GitHub CLI credentials",
 			description: "Mount gh config for GitHub operations",
 			value:       existing.DefaultCredentials.GH,
 		},
 		{
 			name:        "gpg",
 			fieldType:   "toggle",
-			title:       "🔏 GPG credentials",
+			title:       "GPG credentials",
 			description: "Mount ~/.gnupg (read-only) for commit signing",
 			value:       existing.DefaultCredentials.GPG,
 		},
 		{
 			name:        "npm",
 			fieldType:   "toggle",
-			title:       "📦 npm credentials",
+			title:       "npm credentials",
 			description: "Mount ~/.npmrc for authenticated npm operations",
 			value:       existing.DefaultCredentials.NPM,
 		},
 		{
 			name:        "aws",
 			fieldType:   "toggle",
-			title:       "☁️  AWS credentials",
+			title:       "AWS credentials",
 			description: "Mount ~/.aws and AWS environment variables",
 			value:       existing.DefaultCredentials.AWS,
 		},
 		{
 			name:        "save",
 			fieldType:   "button",
-			title:       "💾 Save Configuration",
+			title:       "Save Configuration",
 			description: "Save changes to config file",
 		},
 		{
 			name:        "cancel",
 			fieldType:   "button",
-			title:       "❌ Cancel",
+			title:       "Cancel",
 			description: "Exit without saving changes",
 		},
 	}
@@ -509,21 +509,21 @@ func cycleSelectOption(model *ConfigTUIModel) *ConfigTUIModel {
 func (m *ConfigTUIModel) renderView() string {
 	var lines []string
 
-	// Header
-	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("12"))
-	lines = append(lines, headerStyle.Render("⚙️  packnplay Configuration"))
-	lines = append(lines, "Use ↑/↓ arrows to navigate • Enter/Space to toggle • 's' to save • 'q' to cancel")
+	// Header with clean styling
+	headerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("39"))
+	lines = append(lines, headerStyle.Render("packnplay Configuration"))
+	lines = append(lines, lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render("Use ↑/↓ to navigate • Enter/Space to select • 's' save • 'q' cancel"))
 	lines = append(lines, "")
 
 	// Runtime section
-	lines = append(lines, headerStyle.Render("🐳 Container Runtime"))
+	lines = append(lines, headerStyle.Render("Container Runtime"))
 	runtimeField := m.fields[0] // Runtime is always first
 	runtimeLine := m.renderSelectField(0, runtimeField)
 	lines = append(lines, runtimeLine)
 	lines = append(lines, "")
 
 	// Credentials section
-	lines = append(lines, headerStyle.Render("🔐 Credentials"))
+	lines = append(lines, headerStyle.Render("Credentials"))
 	for i := 1; i < len(m.fields); i++ { // Skip runtime field
 		field := m.fields[i]
 		if field.fieldType == "toggle" {
@@ -545,38 +545,49 @@ func (m *ConfigTUIModel) renderView() string {
 	return strings.Join(lines, "\n")
 }
 
-// renderToggleField renders a toggle field with right-aligned toggle
+// renderToggleField renders a toggle field with colored toggle widget
 func (m *ConfigTUIModel) renderToggleField(index int, field ConfigField) string {
 	focused := index == m.currentField
 	value := field.value.(bool)
 
-	// Create base style
-	baseStyle := lipgloss.NewStyle().Width(m.width - 10)
+	// Use consistent spacing - cursor goes where space would be
+	cursor := " "
 	if focused {
-		baseStyle = baseStyle.Foreground(lipgloss.Color("12")).Bold(true)
+		cursor = "●"
 	}
 
-	// Format toggle value
-	toggle := "[No]"
+	// Create colored toggle widget
+	var toggle string
 	if value {
-		toggle = "[Yes]"
+		toggle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#00ff00")).
+			Bold(true).
+			Render("ON ")
+	} else {
+		toggle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#888888")).
+			Render("OFF")
 	}
 
-	// Create line with title on left, toggle on right
-	title := field.title
-	description := field.description
-
-	line := fmt.Sprintf("%-45s %s", title, toggle)
+	// Title styling
+	titleStyle := lipgloss.NewStyle()
 	if focused {
-		line = "▶ " + line
+		titleStyle = titleStyle.Foreground(lipgloss.Color("39")).Bold(true)
 	}
 
-	// Always show description for better UX
-	if description != "" {
-		line += "\n  " + description
+	// Create consistent layout with no jumping
+	title := titleStyle.Render(field.title)
+	line := fmt.Sprintf("%s%-44s %s", cursor, title, toggle)
+
+	// Always show description (consistent spacing)
+	if field.description != "" {
+		descStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("240")).
+			MarginLeft(2)
+		line += "\n" + descStyle.Render(field.description)
 	}
 
-	return baseStyle.Render(line)
+	return line
 }
 
 // renderSelectField renders a select field
@@ -584,45 +595,83 @@ func (m *ConfigTUIModel) renderSelectField(index int, field ConfigField) string 
 	focused := index == m.currentField
 	value := field.value.(string)
 
-	baseStyle := lipgloss.NewStyle().Width(m.width - 10)
+	// Consistent cursor positioning
+	cursor := " "
 	if focused {
-		baseStyle = baseStyle.Foreground(lipgloss.Color("12")).Bold(true)
+		cursor = "●"
 	}
 
-	line := fmt.Sprintf("%-45s [%s]", field.title, value)
+	// Value styling
+	valueStyle := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("39")).
+		Bold(true)
+
+	// Title styling
+	titleStyle := lipgloss.NewStyle()
 	if focused {
-		line = "▶ " + line
+		titleStyle = titleStyle.Foreground(lipgloss.Color("39")).Bold(true)
 	}
 
-	// Always show description for better UX
+	title := titleStyle.Render(field.title)
+	valueText := valueStyle.Render(value)
+	line := fmt.Sprintf("%s%-44s %s", cursor, title, valueText)
+
+	// Always show description
 	if field.description != "" {
-		line += "\n  " + field.description
+		descStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("240")).
+			MarginLeft(2)
+		line += "\n" + descStyle.Render(field.description)
 	}
 
-	return baseStyle.Render(line)
+	return line
 }
 
 // renderButtonField renders a button field
 func (m *ConfigTUIModel) renderButtonField(index int, field ConfigField) string {
 	focused := index == m.currentField
 
-	baseStyle := lipgloss.NewStyle().Width(m.width - 10)
+	// Consistent cursor positioning
+	cursor := " "
 	if focused {
-		baseStyle = baseStyle.Foreground(lipgloss.Color("12")).Bold(true)
+		cursor = "●"
 	}
 
-	// Style button differently
-	button := field.title
+	// Button styling
+	buttonStyle := lipgloss.NewStyle().
+		Padding(0, 1).
+		Margin(0, 1)
+
 	if focused {
-		button = "▶ " + button
+		if field.name == "save" {
+			buttonStyle = buttonStyle.
+				Background(lipgloss.Color("34")).
+				Foreground(lipgloss.Color("15")).
+				Bold(true)
+		} else {
+			buttonStyle = buttonStyle.
+				Background(lipgloss.Color("1")).
+				Foreground(lipgloss.Color("15")).
+				Bold(true)
+		}
+	} else {
+		buttonStyle = buttonStyle.
+			Foreground(lipgloss.Color("240")).
+			Border(lipgloss.RoundedBorder())
 	}
 
-	// Always show description for buttons
+	button := buttonStyle.Render(field.title)
+	line := fmt.Sprintf("%s%s", cursor, button)
+
+	// Always show description
 	if field.description != "" {
-		button += "\n  " + field.description
+		descStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("240")).
+			MarginLeft(2)
+		line += "\n" + descStyle.Render(field.description)
 	}
 
-	return baseStyle.Render(button)
+	return line
 }
 
 // runCustomConfigTUI runs the custom configuration TUI
