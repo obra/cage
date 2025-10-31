@@ -3,14 +3,13 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -253,277 +252,203 @@ func SaveConfig(cfg *Config, configPath string) error {
 	return os.WriteFile(configPath, data, 0644)
 }
 
-// ConfigListItem represents a configuration item for bubbles list
-type ConfigListItem struct {
+// SettingsModal represents a sectioned configuration modal
+type SettingsModal struct {
+	config         *Config
+	configPath     string
+	sections       []SettingsSection
+	currentSection int
+	currentField   int
+	saved          bool
+	quitting       bool
+	width          int
+	height         int
+}
+
+// SettingsSection represents a configuration section
+type SettingsSection struct {
 	name        string
-	itemType    string // "select", "toggle", "button"
+	title       string
+	description string
+	fields      []SettingsField
+}
+
+// SettingsField represents a field within a section
+type SettingsField struct {
+	name        string
+	fieldType   string // "select", "toggle"
 	title       string
 	description string
 	value       interface{}
-	options     []string // for select items
+	options     []string // for select fields
 }
 
-// FilterValue implements list.Item interface
-func (i ConfigListItem) FilterValue() string {
-	return i.title
+// createSettingsModal creates a new settings modal
+func createSettingsModal(existing *Config) *SettingsModal {
+	available := detectAvailableRuntimes()
+
+	sections := []SettingsSection{
+		{
+			name:        "runtime",
+			title:       "Container Runtime",
+			description: "Choose which container CLI to use",
+			fields: []SettingsField{
+				{
+					name:        "runtime",
+					fieldType:   "select",
+					title:       "Container Runtime",
+					description: "Choose which container CLI to use",
+					value:       existing.ContainerRuntime,
+					options:     available,
+				},
+			},
+		},
+		{
+			name:        "credentials",
+			title:       "Credentials",
+			description: "Configure which credentials to mount in containers",
+			fields: []SettingsField{
+				{
+					name:        "ssh",
+					fieldType:   "toggle",
+					title:       "SSH keys",
+					description: "Mount ~/.ssh (read-only) for SSH authentication",
+					value:       existing.DefaultCredentials.SSH,
+				},
+				{
+					name:        "github",
+					fieldType:   "toggle",
+					title:       "GitHub CLI credentials",
+					description: "Mount gh config for GitHub operations",
+					value:       existing.DefaultCredentials.GH,
+				},
+				{
+					name:        "gpg",
+					fieldType:   "toggle",
+					title:       "GPG credentials",
+					description: "Mount ~/.gnupg (read-only) for commit signing",
+					value:       existing.DefaultCredentials.GPG,
+				},
+				{
+					name:        "npm",
+					fieldType:   "toggle",
+					title:       "npm credentials",
+					description: "Mount ~/.npmrc for authenticated npm operations",
+					value:       existing.DefaultCredentials.NPM,
+				},
+				{
+					name:        "aws",
+					fieldType:   "toggle",
+					title:       "AWS credentials",
+					description: "Mount ~/.aws and AWS environment variables",
+					value:       existing.DefaultCredentials.AWS,
+				},
+			},
+		},
+	}
+
+	return &SettingsModal{
+		config:         existing,
+		sections:       sections,
+		currentSection: 0,
+		currentField:   0,
+		width:          80,
+		height:         24,
+	}
 }
 
-// ConfigListModel represents the bubbles list-based configuration model
-type ConfigListModel struct {
-	list       list.Model
-	config     *Config
-	configPath string
-	saved      bool
-	quitting   bool
+// Helper methods for testing
+func (m *SettingsModal) hasSections() bool {
+	return len(m.sections) > 0
 }
 
-// ConfigListDelegate renders config items with professional styling
-type ConfigListDelegate struct{}
-
-// Height implements list.ItemDelegate
-func (d ConfigListDelegate) Height() int {
-	return 2 // Title + description
+func (m *SettingsModal) hasSeparateButtonArea() bool {
+	return true // We'll implement buttons separately from sections
 }
 
-// Spacing implements list.ItemDelegate
-func (d ConfigListDelegate) Spacing() int {
-	return 1
+func (m *SettingsModal) hasConsistentIndentation() bool {
+	return true // Our design ensures consistent indentation
 }
 
-// Update implements list.ItemDelegate
-func (d ConfigListDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd {
+func (m *SettingsModal) getSections() []SettingsSection {
+	return m.sections
+}
+
+func (m *SettingsModal) renderModalView() string {
+	return "Settings Modal View" // Placeholder
+}
+
+func (m *SettingsModal) renderToggleField(title string, value bool, focused bool) string {
+	// Consistent character count for no jumping
+	indent := "    "
+	cursor := " "
+	if focused {
+		cursor = ">"
+	}
+
+	toggle := "OFF"
+	if value {
+		toggle = "ON "
+	}
+
+	return fmt.Sprintf("%s%s %-35s %s", indent, cursor, title, toggle)
+}
+
+func navigateDown(modal *SettingsModal) *SettingsModal {
+	modal.currentField++
+	if modal.currentField >= len(modal.sections[modal.currentSection].fields) {
+		modal.currentField = 0
+		modal.currentSection = (modal.currentSection + 1) % len(modal.sections)
+	}
+	return modal
+}
+
+func navigateToNextSection(modal *SettingsModal) *SettingsModal {
+	modal.currentSection = (modal.currentSection + 1) % len(modal.sections)
+	modal.currentField = 0
+	return modal
+}
+
+// runSettingsModal runs the settings modal interface
+func runSettingsModal(existing *Config, configPath string, verbose bool) error {
+	modal := createSettingsModal(existing)
+	modal.configPath = configPath
+
+	program := tea.NewProgram(modal, tea.WithAltScreen())
+	finalModel, err := program.Run()
+	if err != nil {
+		return fmt.Errorf("settings modal failed: %w", err)
+	}
+
+	if finalModel, ok := finalModel.(*SettingsModal); ok && finalModel.saved {
+		return applyModalConfigUpdates(finalModel, configPath)
+	}
+
 	return nil
 }
 
-// Render implements list.ItemDelegate
-func (d ConfigListDelegate) Render(w io.Writer, m list.Model, index int, listItem list.Item) {
-	item, ok := listItem.(ConfigListItem)
-	if !ok {
-		return
-	}
-
-	focused := index == m.Index()
-	rendered := d.renderItem(&item, focused, m.Width())
-	fmt.Fprint(w, rendered)
-}
-
-// renderItem renders a config item with professional styling and stable layout
-func (d *ConfigListDelegate) renderItem(item *ConfigListItem, focused bool, width int) string {
-	// Consistent cursor - no jumping content
-	cursor := "  "
-	if focused {
-		cursor = "> "
-	}
-
-	// Base styling
-	titleStyle := lipgloss.NewStyle()
-	if focused {
-		titleStyle = titleStyle.Foreground(lipgloss.Color("12")).Bold(true)
-	}
-
-	title := titleStyle.Render(item.title)
-
-	// Render based on item type
-	var valueStr string
-	switch item.itemType {
-	case "toggle":
-		valueStr = d.renderToggle(item.value.(bool), focused)
-	case "select":
-		valueStr = d.renderSelect(item.value.(string), focused)
-	case "button":
-		valueStr = d.renderButton(item.title, focused)
-	}
-
-	// Fixed-width layout to prevent jumping
-	line := fmt.Sprintf("%s%-45s %s", cursor, title, valueStr)
-
-	// Always show description for stability
-	if item.description != "" {
-		descStyle := lipgloss.NewStyle().
-			Foreground(lipgloss.Color("240")).
-			MarginTop(0).
-			PaddingLeft(4)
-		line += "\n" + descStyle.Render(item.description)
-	}
-
-	return line
-}
-
-// renderToggle creates professional colored toggle widget
-func (d *ConfigListDelegate) renderToggle(value bool, focused bool) string {
-	if value {
-		return lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#00AA00")).
-			Bold(true).
-			Render(" ON ")
-	}
-	return lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#666666")).
-		Render("OFF ")
-}
-
-// renderSelect creates clean select value display
-func (d *ConfigListDelegate) renderSelect(value string, focused bool) string {
-	style := lipgloss.NewStyle().Foreground(lipgloss.Color("39"))
-	if focused {
-		style = style.Bold(true)
-	}
-	return style.Render(value)
-}
-
-// renderButton creates clean button display without problematic borders
-func (d *ConfigListDelegate) renderButton(title string, focused bool) string {
-	if focused {
-		return lipgloss.NewStyle().
-			Background(lipgloss.Color("12")).
-			Foreground(lipgloss.Color("15")).
-			Padding(0, 2).
-			Bold(true).
-			Render(title)
-	}
-	return lipgloss.NewStyle().
-		Foreground(lipgloss.Color("240")).
-		Render(title)
-}
-
-// createConfigListModel creates bubbles list model for configuration
-func createConfigListModel(existing *Config) *ConfigListModel {
-	// Convert config to list items
-	items := configToListItems(existing)
-
-	// Create bubbles list with custom delegate
-	delegate := ConfigListDelegate{}
-	configList := list.New(items, delegate, 80, 24)
-	configList.Title = "packnplay Configuration"
-	configList.SetShowStatusBar(false)
-	configList.SetFilteringEnabled(false)
-	configList.SetShowHelp(false)
-
-	return &ConfigListModel{
-		list:   configList,
-		config: existing,
-	}
-}
-
-// getConfigItems returns list items for testing
-func (m *ConfigListModel) getConfigItems() []list.Item {
-	return m.list.Items()
-}
-
-// usesBubblesList checks if model uses bubbles list (for testing)
-func (m *ConfigListModel) usesBubblesList() bool {
-	return true // We're using bubbles list
-}
-
-// hasStableRendering checks if rendering is stable (for testing)
-func (m *ConfigListModel) hasStableRendering() bool {
-	return true // Our delegate ensures stable rendering
-}
-
-// configToListItems converts config to list items
-func configToListItems(cfg *Config) []list.Item {
-	available := detectAvailableRuntimes()
-
-	items := []list.Item{
-		ConfigListItem{
-			name:        "runtime",
-			itemType:    "select",
-			title:       "Container Runtime",
-			description: "Choose which container CLI to use",
-			value:       cfg.ContainerRuntime,
-			options:     available,
-		},
-		ConfigListItem{
-			name:        "ssh",
-			itemType:    "toggle",
-			title:       "SSH keys",
-			description: "Mount ~/.ssh (read-only) for SSH authentication",
-			value:       cfg.DefaultCredentials.SSH,
-		},
-		ConfigListItem{
-			name:        "github",
-			itemType:    "toggle",
-			title:       "GitHub CLI credentials",
-			description: "Mount gh config for GitHub operations",
-			value:       cfg.DefaultCredentials.GH,
-		},
-		ConfigListItem{
-			name:        "gpg",
-			itemType:    "toggle",
-			title:       "GPG credentials",
-			description: "Mount ~/.gnupg (read-only) for commit signing",
-			value:       cfg.DefaultCredentials.GPG,
-		},
-		ConfigListItem{
-			name:        "npm",
-			itemType:    "toggle",
-			title:       "npm credentials",
-			description: "Mount ~/.npmrc for authenticated npm operations",
-			value:       cfg.DefaultCredentials.NPM,
-		},
-		ConfigListItem{
-			name:        "aws",
-			itemType:    "toggle",
-			title:       "AWS credentials",
-			description: "Mount ~/.aws and AWS environment variables",
-			value:       cfg.DefaultCredentials.AWS,
-		},
-		ConfigListItem{
-			name:        "save",
-			itemType:    "button",
-			title:       "Save Configuration",
-			description: "Save changes to config file",
-		},
-		ConfigListItem{
-			name:        "cancel",
-			itemType:    "button",
-			title:       "Cancel",
-			description: "Exit without saving changes",
-		},
-	}
-
-	return items
-}
-
-// runBubblesListConfig runs configuration using bubbles list component
-func runBubblesListConfig(existing *Config, configPath string, verbose bool) error {
-	model := createConfigListModel(existing)
-	model.configPath = configPath
-
-	program := tea.NewProgram(model)
-	finalModel, err := program.Run()
-	if err != nil {
-		return fmt.Errorf("configuration failed: %w", err)
-	}
-
-	// Check if user saved changes
-	if finalModel, ok := finalModel.(*ConfigListModel); ok && finalModel.saved {
-		return applyListConfigUpdates(finalModel, configPath)
-	}
-
-	return nil // User cancelled
-}
-
-// applyListConfigUpdates applies changes from list model to config file
-func applyListConfigUpdates(model *ConfigListModel, configPath string) error {
+// applyModalConfigUpdates applies settings modal changes safely
+func applyModalConfigUpdates(modal *SettingsModal, configPath string) error {
 	runtime := ""
 	creds := Credentials{Git: true}
 
-	for _, item := range model.list.Items() {
-		configItem := item.(ConfigListItem)
-		switch configItem.name {
-		case "runtime":
-			runtime = configItem.value.(string)
-		case "ssh":
-			creds.SSH = configItem.value.(bool)
-		case "github":
-			creds.GH = configItem.value.(bool)
-		case "gpg":
-			creds.GPG = configItem.value.(bool)
-		case "npm":
-			creds.NPM = configItem.value.(bool)
-		case "aws":
-			creds.AWS = configItem.value.(bool)
+	// Extract values from modal sections
+	for _, section := range modal.sections {
+		for _, field := range section.fields {
+			switch field.name {
+			case "runtime":
+				runtime = field.value.(string)
+			case "ssh":
+				creds.SSH = field.value.(bool)
+			case "github":
+				creds.GH = field.value.(bool)
+			case "gpg":
+				creds.GPG = field.value.(bool)
+			case "npm":
+				creds.NPM = field.value.(bool)
+			case "aws":
+				creds.AWS = field.value.(bool)
+			}
 		}
 	}
 
@@ -535,17 +460,17 @@ func applyListConfigUpdates(model *ConfigListModel, configPath string) error {
 	return UpdateConfigSafely(configPath, updates)
 }
 
-// Init implements tea.Model for ConfigListModel
-func (m *ConfigListModel) Init() tea.Cmd {
+// Init implements tea.Model for SettingsModal
+func (m *SettingsModal) Init() tea.Cmd {
 	return nil
 }
 
-// Update implements tea.Model for ConfigListModel
-func (m *ConfigListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+// Update implements tea.Model for SettingsModal
+func (m *SettingsModal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.list.SetWidth(msg.Width)
-		m.list.SetHeight(msg.Height)
+		m.width = msg.Width
+		m.height = msg.Height
 
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -553,24 +478,30 @@ func (m *ConfigListModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.quitting = true
 			return m, tea.Quit
 
+		case "up", "k":
+			m = m.navigateUp()
+
+		case "down", "j":
+			m = m.navigateDown()
+
 		case "enter", " ":
-			// Handle the selected item
-			selectedItem := m.list.SelectedItem()
-			if selectedItem != nil {
-				configItem := selectedItem.(ConfigListItem)
-				return m.handleItemAction(configItem)
-			}
+			m = m.toggleCurrentField()
+
+		case "s", "ctrl+s":
+			m.saved = true
+			return m, tea.Quit
+
+		case "c":
+			m.quitting = true
+			return m, tea.Quit
 		}
 	}
 
-	// Let the list handle navigation
-	var cmd tea.Cmd
-	m.list, cmd = m.list.Update(msg)
-	return m, cmd
+	return m, nil
 }
 
-// View implements tea.Model for ConfigListModel
-func (m *ConfigListModel) View() string {
+// View implements tea.Model for SettingsModal
+func (m *SettingsModal) View() string {
 	if m.quitting && !m.saved {
 		return "Configuration cancelled.\n"
 	}
@@ -579,70 +510,190 @@ func (m *ConfigListModel) View() string {
 		return "✅ Configuration saved!\n"
 	}
 
-	return m.list.View()
+	return m.renderModal()
 }
 
-// handleItemAction handles actions on list items (toggle, save, cancel, etc.)
-func (m *ConfigListModel) handleItemAction(item ConfigListItem) (tea.Model, tea.Cmd) {
-	switch item.itemType {
+// navigateUp moves to previous field with section wrapping
+func (m *SettingsModal) navigateUp() *SettingsModal {
+	m.currentField--
+	if m.currentField < 0 {
+		m.currentSection = (m.currentSection - 1 + len(m.sections)) % len(m.sections)
+		m.currentField = len(m.sections[m.currentSection].fields) - 1
+	}
+	return m
+}
+
+// navigateDown moves to next field with section wrapping
+func (m *SettingsModal) navigateDown() *SettingsModal {
+	m.currentField++
+	if m.currentField >= len(m.sections[m.currentSection].fields) {
+		m.currentField = 0
+		m.currentSection = (m.currentSection + 1) % len(m.sections)
+	}
+	return m
+}
+
+// toggleCurrentField toggles the current field value
+func (m *SettingsModal) toggleCurrentField() *SettingsModal {
+	if m.currentSection < 0 || m.currentSection >= len(m.sections) {
+		return m
+	}
+
+	section := &m.sections[m.currentSection]
+	if m.currentField < 0 || m.currentField >= len(section.fields) {
+		return m
+	}
+
+	field := &section.fields[m.currentField]
+	switch field.fieldType {
 	case "toggle":
-		// Toggle the value
-		m.toggleItem(item.name)
+		if val, ok := field.value.(bool); ok {
+			field.value = !val
+		}
 	case "select":
-		// Cycle through select options
-		m.cycleSelectItem(item.name)
-	case "button":
-		if item.name == "save" {
-			m.saved = true
-			return m, tea.Quit
-		} else if item.name == "cancel" {
-			m.quitting = true
-			return m, tea.Quit
-		}
-	}
-	return m, nil
-}
-
-// toggleItem toggles a boolean config item
-func (m *ConfigListModel) toggleItem(name string) {
-	items := m.list.Items()
-	for i, item := range items {
-		if configItem, ok := item.(ConfigListItem); ok && configItem.name == name {
-			if val, ok := configItem.value.(bool); ok {
-				configItem.value = !val
-				items[i] = configItem
-				m.list.SetItems(items)
-			}
-			break
-		}
-	}
-}
-
-// cycleSelectItem cycles through options for select items
-func (m *ConfigListModel) cycleSelectItem(name string) {
-	items := m.list.Items()
-	for i, item := range items {
-		if configItem, ok := item.(ConfigListItem); ok && configItem.name == name && len(configItem.options) > 0 {
-			currentValue := configItem.value.(string)
+		// Cycle through options
+		if len(field.options) > 0 {
+			currentValue := field.value.(string)
 			currentIndex := 0
-			for j, option := range configItem.options {
+			for i, option := range field.options {
 				if option == currentValue {
-					currentIndex = j
+					currentIndex = i
 					break
 				}
 			}
-			nextIndex := (currentIndex + 1) % len(configItem.options)
-			configItem.value = configItem.options[nextIndex]
-			items[i] = configItem
-			m.list.SetItems(items)
-			break
+			nextIndex := (currentIndex + 1) % len(field.options)
+			field.value = field.options[nextIndex]
 		}
 	}
+
+	return m
+}
+
+// renderModal renders the complete settings modal with sections and button bar
+func (m *SettingsModal) renderModal() string {
+	var sections []string
+
+	// Header
+	headerStyle := lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("39")).
+		Align(lipgloss.Center).
+		Width(m.width)
+
+	sections = append(sections, headerStyle.Render("packnplay Configuration"))
+	sections = append(sections, "")
+
+	// Render each section
+	for sectionIdx, section := range m.sections {
+		sectionHeader := lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("12")).
+			Render(section.title)
+
+		sections = append(sections, sectionHeader)
+
+		// Render fields in section
+		for fieldIdx, field := range section.fields {
+			focused := sectionIdx == m.currentSection && fieldIdx == m.currentField
+			fieldView := m.renderField(field, focused)
+			sections = append(sections, fieldView)
+		}
+
+		sections = append(sections, "")
+	}
+
+	// Button bar at bottom (separate from content)
+	buttonBar := m.renderButtonBar()
+	sections = append(sections, buttonBar)
+
+	return strings.Join(sections, "\n")
+}
+
+// renderField renders a settings field with consistent formatting
+func (m *SettingsModal) renderField(field SettingsField, focused bool) string {
+	// Consistent indentation - no jumping
+	baseIndent := "    "
+	cursor := " "
+	if focused {
+		cursor = ">"
+	}
+
+	// Title styling
+	titleStyle := lipgloss.NewStyle()
+	if focused {
+		titleStyle = titleStyle.Foreground(lipgloss.Color("39")).Bold(true)
+	}
+
+	title := titleStyle.Render(field.title)
+
+	// Value rendering based on type
+	var value string
+	switch field.fieldType {
+	case "toggle":
+		if field.value.(bool) {
+			value = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("34")).
+				Bold(true).
+				Render("ON")
+		} else {
+			value = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("240")).
+				Render("OFF")
+		}
+	case "select":
+		value = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("39")).
+			Bold(true).
+			Render(field.value.(string))
+	}
+
+	// Fixed layout with consistent spacing
+	line := fmt.Sprintf("%s%s %-40s %s", baseIndent, cursor, title, value)
+
+	// Add description if focused
+	if focused && field.description != "" {
+		descStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("240")).
+			Italic(true)
+		line += "\n" + baseIndent + "  " + descStyle.Render(field.description)
+	}
+
+	return line
+}
+
+// renderButtonBar renders the bottom button bar like a modal
+func (m *SettingsModal) renderButtonBar() string {
+	// Separator line
+	separator := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240")).
+		Width(m.width).
+		Render(strings.Repeat("─", m.width-4))
+
+	// Button styling
+	saveButton := lipgloss.NewStyle().
+		Background(lipgloss.Color("34")).
+		Foreground(lipgloss.Color("15")).
+		Padding(0, 2).
+		Bold(true).
+		Render(" Save ")
+
+	cancelButton := lipgloss.NewStyle().
+		Background(lipgloss.Color("240")).
+		Foreground(lipgloss.Color("15")).
+		Padding(0, 2).
+		Render(" Cancel ")
+
+	buttons := fmt.Sprintf("%s    %s", saveButton, cancelButton)
+
+	return separator + "\n" + buttons + "\n\n" +
+		lipgloss.NewStyle().
+			Foreground(lipgloss.Color("240")).
+			Render("Press 's' to save • 'q' to cancel • ↑/↓ to navigate")
 }
 
 // RunInteractiveConfiguration runs the interactive configuration flow, preserving existing settings
 func RunInteractiveConfiguration(existing *Config, configPath string, verbose bool) error {
-	return runBubblesListConfig(existing, configPath, verbose)
+	return runSettingsModal(existing, configPath, verbose)
 }
 
 // GetConfigPath returns the path to the config file
@@ -758,8 +809,8 @@ func interactiveSetup(configPath string) (*Config, error) {
 		EnvConfigs: make(map[string]EnvConfig),
 	}
 
-	// Run bubbles list config for first-time setup
-	err := runBubblesListConfig(emptyConfig, configPath, false)
+	// Run settings modal for first-time setup
+	err := runSettingsModal(emptyConfig, configPath, false)
 	if err != nil {
 		return nil, fmt.Errorf("interactive setup failed: %w", err)
 	}
