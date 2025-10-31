@@ -648,8 +648,8 @@ func (m *SettingsModal) renderField(field SettingsField, focused bool) string {
 		cursor = ">"    // 1 character when focused
 	}
 
-	// Title styling
-	titleStyle := lipgloss.NewStyle()
+	// Title styling with FIXED width to prevent right-align jumping
+	titleStyle := lipgloss.NewStyle().Width(40) // Fixed width regardless of styling
 	if focused {
 		titleStyle = titleStyle.Foreground(lipgloss.Color("39")).Bold(true)
 	}
@@ -695,8 +695,8 @@ func (m *SettingsModal) renderField(field SettingsField, focused bool) string {
 		}
 	}
 
-	// FIXED: Consistent character positions prevent jumping
-	line := fmt.Sprintf("%s%s%-40s %s", baseIndent, cursor, title, value)
+	// FIXED: Use fixed-width title to ensure right-alignment stays consistent
+	line := fmt.Sprintf("%s%s%s %s", baseIndent, cursor, title, value)
 
 	// FIXED: Always show description, not just when focused
 	if field.description != "" {
