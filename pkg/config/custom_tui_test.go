@@ -27,8 +27,8 @@ func TestCustomConfigTUI(t *testing.T) {
 
 	// Should show all config fields in one screen
 	fieldCount := model.getFieldCount()
-	if fieldCount < 6 {
-		t.Errorf("Should have at least 6 fields (runtime + 5 credentials), got %d", fieldCount)
+	if fieldCount < 8 {
+		t.Errorf("Should have at least 8 fields (runtime + 5 credentials + 2 buttons), got %d", fieldCount)
 	}
 
 	// Should have proper field types

@@ -323,6 +323,18 @@ func createConfigTUIModel(existing *Config) *ConfigTUIModel {
 			description: "Mount ~/.aws and AWS environment variables",
 			value:       existing.DefaultCredentials.AWS,
 		},
+		{
+			name:        "save",
+			fieldType:   "button",
+			title:       "💾 Save Configuration",
+			description: "Save changes to config file",
+		},
+		{
+			name:        "cancel",
+			fieldType:   "button",
+			title:       "❌ Cancel",
+			description: "Exit without saving changes",
+		},
 	}
 
 	return &ConfigTUIModel{
@@ -431,12 +443,21 @@ func (m *ConfigTUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m = moveDown(m)
 
 		case "enter", " ":
-			// Toggle current field or cycle through options
-			if m.fields[m.currentField].fieldType == "toggle" {
+			// Handle different field types
+			currentField := m.fields[m.currentField]
+			switch currentField.fieldType {
+			case "toggle":
 				m = toggleCurrentField(m)
-			} else if m.fields[m.currentField].fieldType == "select" {
-				// Cycle through select options
+			case "select":
 				m = cycleSelectOption(m)
+			case "button":
+				if currentField.name == "save" {
+					m.saved = true
+					return m, tea.Quit
+				} else if currentField.name == "cancel" {
+					m.quitting = true
+					return m, tea.Quit
+				}
 			}
 
 		case "s", "ctrl+s":
@@ -510,6 +531,16 @@ func (m *ConfigTUIModel) renderView() string {
 			lines = append(lines, line)
 		}
 	}
+	lines = append(lines, "")
+
+	// Action buttons at bottom
+	lines = append(lines, headerStyle.Render("Actions"))
+	for i, field := range m.fields {
+		if field.fieldType == "button" {
+			line := m.renderButtonField(i, field)
+			lines = append(lines, line)
+		}
+	}
 
 	return strings.Join(lines, "\n")
 }
@@ -538,9 +569,11 @@ func (m *ConfigTUIModel) renderToggleField(index int, field ConfigField) string 
 	line := fmt.Sprintf("%-45s %s", title, toggle)
 	if focused {
 		line = "▶ " + line
-		if description != "" {
-			line += "\n  " + description
-		}
+	}
+
+	// Always show description for better UX
+	if description != "" {
+		line += "\n  " + description
 	}
 
 	return baseStyle.Render(line)
@@ -559,12 +592,37 @@ func (m *ConfigTUIModel) renderSelectField(index int, field ConfigField) string 
 	line := fmt.Sprintf("%-45s [%s]", field.title, value)
 	if focused {
 		line = "▶ " + line
-		if field.description != "" {
-			line += "\n  " + field.description
-		}
+	}
+
+	// Always show description for better UX
+	if field.description != "" {
+		line += "\n  " + field.description
 	}
 
 	return baseStyle.Render(line)
+}
+
+// renderButtonField renders a button field
+func (m *ConfigTUIModel) renderButtonField(index int, field ConfigField) string {
+	focused := index == m.currentField
+
+	baseStyle := lipgloss.NewStyle().Width(m.width - 10)
+	if focused {
+		baseStyle = baseStyle.Foreground(lipgloss.Color("12")).Bold(true)
+	}
+
+	// Style button differently
+	button := field.title
+	if focused {
+		button = "▶ " + button
+	}
+
+	// Always show description for buttons
+	if field.description != "" {
+		button += "\n  " + field.description
+	}
+
+	return baseStyle.Render(button)
 }
 
 // runCustomConfigTUI runs the custom configuration TUI
