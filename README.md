@@ -258,10 +258,29 @@ On first run, packnplay prompts you to choose which credentials to enable by def
 
 ### File Mounts
 
+**Host Path Preservation:**
+packnplay mounts your project at the **exact same path** inside the container as it exists on your host. This ensures absolute path consistency between host and container environments.
+
 - `~/.claude` → mounted read-write (skills, plugins, history)
 - `~/.claude.json` → copied into container (avoids file lock conflicts)
-- Worktree → mounted at same host path (preserves absolute paths)
+- **Project directory** → mounted at identical host path (no `/workspace` abstraction)
 - Main repo `.git` → mounted at its real path (git commands work)
+
+**Examples:**
+```bash
+# Host
+/Users/jesse/Documents/GitHub/myproject
+
+# Container (same path!)
+/Users/jesse/Documents/GitHub/myproject
+```
+
+**Benefits:**
+- Absolute paths work identically in host and container
+- Git worktree references maintain correct paths
+- IDE configurations with hardcoded paths work consistently
+- Symlinks preserve correct relative relationships
+- Cross-container workflows see consistent paths
 
 ### Environment Variables
 
