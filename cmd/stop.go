@@ -19,9 +19,9 @@ var (
 )
 
 var stopCmd = &cobra.Command{
-	Use:   "stop [flags]",
+	Use:   "stop [container_name] [flags]",
 	Short: "Stop container",
-	Long:  `Stop the container for the specified project/worktree.`,
+	Long:  `Stop the container by name, or for the specified project/worktree.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// Initialize Docker client
 		dockerClient, err := docker.NewClient(false)
@@ -34,6 +34,13 @@ var stopCmd = &cobra.Command{
 			return stopAllContainers(dockerClient)
 		}
 
+		// If container name provided as argument, use that
+		if len(args) > 0 {
+			containerName := args[0]
+			return stopContainer(dockerClient, containerName)
+		}
+
+		// Otherwise, use worktree-based approach
 		// Determine working directory
 		workDir := stopPath
 		if workDir == "" {
@@ -52,7 +59,7 @@ var stopCmd = &cobra.Command{
 		// Determine worktree name
 		worktreeName := stopWorktree
 		if worktreeName == "" {
-			return fmt.Errorf("--worktree flag is required for stop (or use --all)")
+			return fmt.Errorf("container name or --worktree flag is required for stop (or use --all)")
 		}
 
 		// Generate container name

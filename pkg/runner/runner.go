@@ -228,7 +228,7 @@ func Run(config *RunConfig) error {
 			errorMsg += fmt.Sprintf("\nTo run your command in the existing container:\n")
 			errorMsg += fmt.Sprintf("  packnplay run%s --reconnect %s\n", worktreeFlag, cmdStr.String())
 			errorMsg += fmt.Sprintf("\nTo stop the existing container:\n")
-			errorMsg += fmt.Sprintf("  packnplay stop%s", worktreeFlag)
+			errorMsg += fmt.Sprintf("  packnplay stop %s", details.Names)
 
 			return fmt.Errorf(errorMsg)
 		}
