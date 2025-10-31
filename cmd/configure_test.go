@@ -24,15 +24,20 @@ func TestConfigureCommand(t *testing.T) {
 	if !containsSubstring(configureCmd.Long, "preserve") {
 		t.Error("configure command should mention preserving existing settings")
 	}
+
+	// Should mention the logical flow
+	if !containsSubstring(configureCmd.Long, "logical flow") {
+		t.Error("configure command should mention logical flow")
+	}
 }
 
 func TestConfigureCommandFlags(t *testing.T) {
-	// Test configure command flags
+	// Test configure command flags (simplified)
 
-	// Should have section selection flags for granular editing
+	// Should NOT have section flag (simplified)
 	flag := configureCmd.Flags().Lookup("section")
-	if flag == nil {
-		t.Error("configure command should have --section flag for granular editing")
+	if flag != nil {
+		t.Error("configure command should not have --section flag (simplified design)")
 	}
 
 	// Should have verbose flag
