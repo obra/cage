@@ -1188,7 +1188,7 @@ func (m *SettingsModal) renderButtonBar() string {
 
 // RunInteractiveConfiguration runs the interactive configuration flow, preserving existing settings
 func RunInteractiveConfiguration(existing *Config, configPath string, verbose bool) error {
-	return runTabbedConfig(existing, configPath, verbose)
+	return runScrollableSections(existing, configPath, verbose)
 }
 
 // GetConfigPath returns the path to the config file
@@ -1304,14 +1304,26 @@ func interactiveSetup(configPath string) (*Config, error) {
 		EnvConfigs: make(map[string]EnvConfig),
 	}
 
-	// Run tabbed config for first-time setup
-	err := runTabbedConfig(emptyConfig, configPath, false)
+	// Run scrollable sections for first-time setup
+	err := runScrollableSections(emptyConfig, configPath, false)
+}
+
+// runScrollableSections runs a simple scrollable section-based configuration
+func runScrollableSections(existing *Config, configPath string, verbose bool) error {
+	modal := createSettingsModal(existing)
+	modal.configPath = configPath
+
+	program := tea.NewProgram(modal, tea.WithAltScreen())
+	finalModel, err := program.Run()
 	if err != nil {
-		return nil, fmt.Errorf("interactive setup failed: %w", err)
+		return fmt.Errorf("configuration failed: %w", err)
 	}
 
-	// Load the saved config
-	return LoadConfigFromFile(configPath)
+	if finalModel, ok := finalModel.(*SettingsModal); ok && finalModel.saved {
+		return applyModalConfigUpdates(finalModel, configPath)
+	}
+
+	return nil
 }
 
 // detectAvailableRuntimes finds which container runtimes are installed
