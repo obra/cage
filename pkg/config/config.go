@@ -252,6 +252,287 @@ func SaveConfig(cfg *Config, configPath string) error {
 	return os.WriteFile(configPath, data, 0644)
 }
 
+// TabbedConfigModel represents a tabbed configuration interface
+type TabbedConfigModel struct {
+	config        *Config
+	configPath    string
+	tabs          []ConfigTab
+	activeTab     int
+	currentField  int
+	buttonFocused bool
+	currentButton int
+	saved         bool
+	quitting      bool
+	width         int
+	height        int
+}
+
+// ConfigTab represents a configuration tab with its fields
+type ConfigTab struct {
+	name        string
+	title       string
+	description string
+	fields      []ConfigField
+}
+
+// ConfigField represents a configurable field
+type ConfigField struct {
+	name        string
+	fieldType   string // "select", "toggle", "text"
+	title       string
+	description string
+	value       interface{}
+	options     []string // for select fields
+}
+
+// createTabbedConfig creates a new tabbed configuration interface
+func createTabbedConfig(existing *Config) *TabbedConfigModel {
+	available := detectAvailableRuntimes()
+
+	tabs := []ConfigTab{
+		{
+			name:        "runtime",
+			title:       "Runtime",
+			description: "Container runtime configuration",
+			fields: []ConfigField{
+				{
+					name:        "runtime",
+					fieldType:   "select",
+					title:       "Container Runtime",
+					description: "Choose which container CLI to use",
+					value:       existing.ContainerRuntime,
+					options:     available,
+				},
+			},
+		},
+		{
+			name:        "credentials",
+			title:       "Credentials",
+			description: "Credential mounting configuration",
+			fields: []ConfigField{
+				{
+					name:        "ssh",
+					fieldType:   "toggle",
+					title:       "SSH keys",
+					description: "Mount ~/.ssh (read-only) for SSH authentication",
+					value:       existing.DefaultCredentials.SSH,
+				},
+				{
+					name:        "github",
+					fieldType:   "toggle",
+					title:       "GitHub CLI credentials",
+					description: "Mount gh config for GitHub operations",
+					value:       existing.DefaultCredentials.GH,
+				},
+				{
+					name:        "gpg",
+					fieldType:   "toggle",
+					title:       "GPG credentials",
+					description: "Mount ~/.gnupg (read-only) for commit signing",
+					value:       existing.DefaultCredentials.GPG,
+				},
+				{
+					name:        "npm",
+					fieldType:   "toggle",
+					title:       "npm credentials",
+					description: "Mount ~/.npmrc for authenticated npm operations",
+					value:       existing.DefaultCredentials.NPM,
+				},
+				{
+					name:        "aws",
+					fieldType:   "toggle",
+					title:       "AWS credentials",
+					description: "Mount ~/.aws and AWS environment variables",
+					value:       existing.DefaultCredentials.AWS,
+				},
+			},
+		},
+		{
+			name:        "container",
+			title:       "Container",
+			description: "Default container configuration",
+			fields: []ConfigField{
+				{
+					name:        "container-image",
+					fieldType:   "text",
+					title:       "Container Image",
+					description: "Default container image to use (supports any registry)",
+					value:       getDefaultImageValue(existing),
+				},
+				{
+					name:        "check-updates",
+					fieldType:   "toggle",
+					title:       "Check for updates",
+					description: "Automatically check registry for new image versions",
+					value:       existing.DefaultContainer.CheckForUpdates,
+				},
+				{
+					name:        "auto-pull",
+					fieldType:   "toggle",
+					title:       "Auto-pull updates",
+					description: "Automatically download new versions when found",
+					value:       existing.DefaultContainer.AutoPullUpdates,
+				},
+				{
+					name:        "check-frequency",
+					fieldType:   "select",
+					title:       "Check frequency",
+					description: "How often to check for updates",
+					value:       formatFrequencyForDisplay(existing.DefaultContainer.CheckFrequencyHours),
+					options:     []string{"6h", "12h", "24h", "48h", "weekly"},
+				},
+			},
+		},
+	}
+
+	return &TabbedConfigModel{
+		config:        existing,
+		tabs:          tabs,
+		activeTab:     0,
+		currentField:  0,
+		buttonFocused: false,
+		currentButton: 0,
+		width:         80,
+		height:        24,
+	}
+}
+
+// Helper methods for testing
+func (m *TabbedConfigModel) hasTab(name string) bool {
+	for _, tab := range m.tabs {
+		if strings.Contains(tab.title, name) {
+			return true
+		}
+	}
+	return false
+}
+
+func (m *TabbedConfigModel) renderActiveTabContent() string {
+	if m.activeTab < 0 || m.activeTab >= len(m.tabs) {
+		return ""
+	}
+
+	tab := m.tabs[m.activeTab]
+	var lines []string
+
+	for i, field := range tab.fields {
+		focused := i == m.currentField && !m.buttonFocused
+		line := m.renderField(field, focused)
+		lines = append(lines, line)
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func (m *TabbedConfigModel) renderTabbedView() string {
+	return "Tabbed Config View" // Placeholder
+}
+
+func (m *TabbedConfigModel) renderField(field ConfigField, focused bool) string {
+	return "Field View" // Placeholder
+}
+
+func switchToNextTab(model *TabbedConfigModel) *TabbedConfigModel {
+	if model.activeTab < len(model.tabs)-1 {
+		model.activeTab++
+		model.currentField = 0 // Reset field when switching tabs
+	}
+	return model
+}
+
+func switchToPrevTab(model *TabbedConfigModel) *TabbedConfigModel {
+	if model.activeTab > 0 {
+		model.activeTab--
+		model.currentField = 0 // Reset field when switching tabs
+	}
+	return model
+}
+
+func navigateDownInTab(model *TabbedConfigModel) *TabbedConfigModel {
+	if model.activeTab < 0 || model.activeTab >= len(model.tabs) {
+		return model
+	}
+
+	maxFields := len(model.tabs[model.activeTab].fields)
+	if model.currentField < maxFields-1 {
+		model.currentField++
+	}
+	return model
+}
+
+// runTabbedConfig runs the tabbed configuration interface
+func runTabbedConfig(existing *Config, configPath string, verbose bool) error {
+	model := createTabbedConfig(existing)
+	model.configPath = configPath
+
+	program := tea.NewProgram(model, tea.WithAltScreen())
+	finalModel, err := program.Run()
+	if err != nil {
+		return fmt.Errorf("tabbed config failed: %w", err)
+	}
+
+	if finalModel, ok := finalModel.(*TabbedConfigModel); ok && finalModel.saved {
+		return applyTabbedConfigUpdates(finalModel, configPath)
+	}
+
+	return nil
+}
+
+// applyTabbedConfigUpdates applies tabbed config changes safely
+func applyTabbedConfigUpdates(model *TabbedConfigModel, configPath string) error {
+	runtime := ""
+	creds := Credentials{Git: true}
+	var containerConfig *DefaultContainerConfig
+
+	// Extract values from all tabs
+	for _, tab := range model.tabs {
+		for _, field := range tab.fields {
+			switch field.name {
+			case "runtime":
+				runtime = field.value.(string)
+			case "ssh":
+				creds.SSH = field.value.(bool)
+			case "github":
+				creds.GH = field.value.(bool)
+			case "gpg":
+				creds.GPG = field.value.(bool)
+			case "npm":
+				creds.NPM = field.value.(bool)
+			case "aws":
+				creds.AWS = field.value.(bool)
+			case "container-image":
+				if containerConfig == nil {
+					containerConfig = &DefaultContainerConfig{}
+				}
+				containerConfig.Image = field.value.(string)
+			case "check-updates":
+				if containerConfig == nil {
+					containerConfig = &DefaultContainerConfig{}
+				}
+				containerConfig.CheckForUpdates = field.value.(bool)
+			case "auto-pull":
+				if containerConfig == nil {
+					containerConfig = &DefaultContainerConfig{}
+				}
+				containerConfig.AutoPullUpdates = field.value.(bool)
+			case "check-frequency":
+				if containerConfig == nil {
+					containerConfig = &DefaultContainerConfig{}
+				}
+				containerConfig.CheckFrequencyHours = parseFrequencyFromDisplay(field.value.(string))
+			}
+		}
+	}
+
+	updates := ConfigUpdates{
+		ContainerRuntime:   &runtime,
+		DefaultCredentials: &creds,
+		DefaultContainer:   containerConfig,
+	}
+
+	return UpdateConfigSafely(configPath, updates)
+}
+
 // SettingsModal represents a sectioned configuration modal
 type SettingsModal struct {
 	config         *Config
@@ -357,7 +638,7 @@ func createSettingsModal(existing *Config) *SettingsModal {
 					fieldType:   "text",
 					title:       "Container Image",
 					description: "Default container image to use (supports any registry)",
-					value:       existing.DefaultContainer.Image,
+					value:       getDefaultImageValue(existing),
 				},
 				{
 					name:        "check-updates",
@@ -588,6 +869,17 @@ func extractDefaultContainerUpdates(modal *SettingsModal) ConfigUpdates {
 	return ConfigUpdates{
 		DefaultContainer: containerConfig,
 	}
+}
+
+// getDefaultImageValue gets the image value with fallback to default
+func getDefaultImageValue(cfg *Config) string {
+	if cfg.DefaultContainer.Image != "" {
+		return cfg.DefaultContainer.Image
+	}
+	if cfg.DefaultImage != "" {
+		return cfg.DefaultImage
+	}
+	return "ghcr.io/obra/packnplay-default:latest"
 }
 
 // Init implements tea.Model for SettingsModal
@@ -896,7 +1188,7 @@ func (m *SettingsModal) renderButtonBar() string {
 
 // RunInteractiveConfiguration runs the interactive configuration flow, preserving existing settings
 func RunInteractiveConfiguration(existing *Config, configPath string, verbose bool) error {
-	return runSettingsModal(existing, configPath, verbose)
+	return runTabbedConfig(existing, configPath, verbose)
 }
 
 // GetConfigPath returns the path to the config file
@@ -1012,8 +1304,8 @@ func interactiveSetup(configPath string) (*Config, error) {
 		EnvConfigs: make(map[string]EnvConfig),
 	}
 
-	// Run settings modal for first-time setup
-	err := runSettingsModal(emptyConfig, configPath, false)
+	// Run tabbed config for first-time setup
+	err := runTabbedConfig(emptyConfig, configPath, false)
 	if err != nil {
 		return nil, fmt.Errorf("interactive setup failed: %w", err)
 	}
@@ -1037,3 +1329,37 @@ func detectAvailableRuntimes() []string {
 
 	return available
 }
+
+
+// Init implements tea.Model for TabbedConfigModel  
+func (m *TabbedConfigModel) Init() tea.Cmd {
+	return nil
+}
+
+// Update implements tea.Model for TabbedConfigModel
+func (m *TabbedConfigModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c", "q":
+			m.quitting = true
+			return m, tea.Quit
+		case "s":
+			m.saved = true  
+			return m, tea.Quit
+		}
+	}
+	return m, nil
+}
+
+// View implements tea.Model for TabbedConfigModel
+func (m *TabbedConfigModel) View() string {
+	if m.quitting && !m.saved {
+		return "Configuration cancelled.\n"
+	}
+	if m.saved {
+		return "✅ Configuration saved!\n"
+	}
+	return "Tabbed Config Placeholder"
+}
+
