@@ -1495,6 +1495,6 @@ func (m *TabbedConfigModel) View() string {
 	if m.saved {
 		return "✅ Configuration saved!\n"
 	}
-	return m.renderTabbedView()
+	return "Tabbed Config Placeholder"
 }
 
