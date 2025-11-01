@@ -1314,14 +1314,21 @@ func interactiveSetup(configPath string) (*Config, error) {
 	return LoadConfigFromFile(configPath)
 }
 
-// runScrollableSections runs a simple scrollable section-based configuration
+// runScrollableSections runs a scrollable section-based configuration using SettingsModal
 func runScrollableSections(existing *Config, configPath string, verbose bool) error {
-	fmt.Println("\n⚙️  packnplay Configuration")
-	fmt.Println("Scrollable sections with all configuration options")
-	fmt.Println("Use ↑/↓ to navigate, Enter to toggle, 's' to save, 'q' to cancel")
+	modal := createSettingsModal(existing)
+	modal.configPath = configPath
 
-	// For now, just show success message
-	fmt.Println("✅ Configuration interface ready")
+	program := tea.NewProgram(modal, tea.WithAltScreen())
+	finalModel, err := program.Run()
+	if err != nil {
+		return fmt.Errorf("configuration failed: %w", err)
+	}
+
+	if finalModel, ok := finalModel.(*SettingsModal); ok && finalModel.saved {
+		return applyModalConfigUpdates(finalModel, configPath)
+	}
+
 	return nil
 }
 
