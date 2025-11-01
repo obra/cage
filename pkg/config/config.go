@@ -10,6 +10,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -542,6 +543,8 @@ type SettingsModal struct {
 	currentField   int
 	buttonFocused  bool   // Are we focused on buttons (not fields)?
 	currentButton  int    // Which button is focused (0=save, 1=cancel)
+	textInput      textinput.Model // For text field editing
+	textEditing    bool   // Are we in text editing mode?
 	saved          bool
 	quitting       bool
 	width          int
@@ -666,11 +669,20 @@ func createSettingsModal(existing *Config) *SettingsModal {
 		},
 	}
 
+	// Initialize text input component
+	ti := textinput.New()
+	ti.Placeholder = "Enter container image..."
+	ti.Width = 50
+
 	return &SettingsModal{
 		config:         existing,
 		sections:       sections,
 		currentSection: 0,
 		currentField:   0,
+		buttonFocused:  false,
+		currentButton:  0,
+		textInput:      ti,
+		textEditing:    false,
 		width:          80,
 		height:         24,
 	}
@@ -687,6 +699,20 @@ func (m *SettingsModal) hasSeparateButtonArea() bool {
 
 func (m *SettingsModal) hasConsistentIndentation() bool {
 	return true // Our design ensures consistent indentation
+}
+
+// getCurrentField returns the currently focused field
+func (m *SettingsModal) getCurrentField() *SettingsField {
+	if m.currentSection < 0 || m.currentSection >= len(m.sections) {
+		return nil
+	}
+
+	section := &m.sections[m.currentSection]
+	if m.currentField < 0 || m.currentField >= len(section.fields) {
+		return nil
+	}
+
+	return &section.fields[m.currentField]
 }
 
 func (m *SettingsModal) getSections() []SettingsSection {
@@ -941,8 +967,25 @@ func (m *SettingsModal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.quitting = true
 					return m, tea.Quit
 				}
+			} else if m.textEditing {
+				// Exit text editing mode and save the value
+				currentField := m.getCurrentField()
+				if currentField != nil {
+					currentField.value = m.textInput.Value()
+				}
+				m.textEditing = false
 			} else {
-				m = m.activateCurrentField()
+				// Check if current field is text field
+				currentField := m.getCurrentField()
+				if currentField != nil && currentField.fieldType == "text" {
+					// Enter text editing mode
+					m.textInput.SetValue(currentField.value.(string))
+					m.textInput.Focus()
+					m.textEditing = true
+				} else {
+					// Activate toggle/select field
+					m = m.activateCurrentField()
+				}
 			}
 
 		case "s", "ctrl+s":
@@ -952,6 +995,13 @@ func (m *SettingsModal) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "c":
 			m.quitting = true
 			return m, tea.Quit
+		default:
+			// Pass other keys to textinput when in text editing mode
+			if m.textEditing {
+				var cmd tea.Cmd
+				m.textInput, cmd = m.textInput.Update(msg)
+				return m, cmd
+			}
 		}
 	}
 
@@ -1112,10 +1162,16 @@ func (m *SettingsModal) renderField(field SettingsField, focused bool) string {
 			Bold(true).
 			Render(field.value.(string))
 	case "text":
-		value = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("39")).
-			Italic(true).
-			Render(field.value.(string))
+		if focused && m.textEditing && field.name == m.getCurrentField().name {
+			// Show textinput component when editing this field
+			value = m.textInput.View()
+		} else {
+			// Show current value
+			value = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("39")).
+				Italic(true).
+				Render(field.value.(string))
+		}
 	}
 
 	// FIXED: Use fixed-width title to ensure right-alignment stays consistent
