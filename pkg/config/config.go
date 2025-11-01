@@ -425,11 +425,146 @@ func (m *TabbedConfigModel) renderActiveTabContent() string {
 }
 
 func (m *TabbedConfigModel) renderTabbedView() string {
-	return "Tabbed Config View" // Placeholder
+	// Render tab headers
+	tabHeaders := m.renderTabHeaders()
+
+	// Render active tab content
+	content := m.renderActiveTabContent()
+
+	// Render button bar
+	buttons := m.renderButtonArea()
+
+	return tabHeaders + "\n\n" + content + "\n\n" + buttons
+}
+
+// renderTabHeaders renders the tab header bar with borders
+func (m *TabbedConfigModel) renderTabHeaders() string {
+	var tabs []string
+
+	for i, tab := range m.tabs {
+		if i == m.activeTab {
+			// Active tab styling
+			activeStyle := lipgloss.NewStyle().
+				Bold(true).
+				Foreground(lipgloss.Color("39")).
+				Background(lipgloss.Color("235")).
+				Padding(0, 2).
+				Border(lipgloss.RoundedBorder()).
+				BorderBottom(false)
+			tabs = append(tabs, activeStyle.Render(tab.title))
+		} else {
+			// Inactive tab styling
+			inactiveStyle := lipgloss.NewStyle().
+				Foreground(lipgloss.Color("240")).
+				Padding(0, 2).
+				Border(lipgloss.RoundedBorder()).
+				BorderBottom(false)
+			tabs = append(tabs, inactiveStyle.Render(tab.title))
+		}
+	}
+
+	// Join tabs horizontally
+	tabBar := lipgloss.JoinHorizontal(lipgloss.Top, tabs...)
+
+	// Add bottom border for content area
+	contentBorder := lipgloss.NewStyle().
+		Width(m.width).
+		Border(lipgloss.NormalBorder()).
+		BorderTop(false).
+		Render("")
+
+	return tabBar + "\n" + contentBorder
+}
+
+// renderButtonArea renders the save/cancel button area
+func (m *TabbedConfigModel) renderButtonArea() string {
+	// Separator line
+	separator := lipgloss.NewStyle().
+		Foreground(lipgloss.Color("240")).
+		Render(strings.Repeat("─", 60))
+
+	// Button styling based on focus
+	saveStyle := lipgloss.NewStyle().Padding(0, 2).Bold(true)
+	cancelStyle := lipgloss.NewStyle().Padding(0, 2)
+
+	if m.buttonFocused && m.currentButton == 0 {
+		saveStyle = saveStyle.Background(lipgloss.Color("34")).Foreground(lipgloss.Color("15"))
+		cancelStyle = cancelStyle.Foreground(lipgloss.Color("240"))
+	} else if m.buttonFocused && m.currentButton == 1 {
+		saveStyle = saveStyle.Foreground(lipgloss.Color("240"))
+		cancelStyle = cancelStyle.Background(lipgloss.Color("1")).Foreground(lipgloss.Color("15")).Bold(true)
+	} else {
+		saveStyle = saveStyle.Foreground(lipgloss.Color("240"))
+		cancelStyle = cancelStyle.Foreground(lipgloss.Color("240"))
+	}
+
+	saveButton := saveStyle.Render(" Save ")
+	cancelButton := cancelStyle.Render(" Cancel ")
+	buttons := fmt.Sprintf("    %s    %s", saveButton, cancelButton)
+
+	helpText := "←/→ switch tabs • ↑/↓ navigate • Enter activate • 's' save • 'q' cancel"
+	if m.buttonFocused {
+		helpText = "Enter activate • ←/→ select button • ↑ back to fields"
+	}
+
+	return separator + "\n" + buttons + "\n\n" +
+		lipgloss.NewStyle().Foreground(lipgloss.Color("240")).Render(helpText)
 }
 
 func (m *TabbedConfigModel) renderField(field ConfigField, focused bool) string {
-	return "Field View" // Placeholder
+	// Fixed indentation - cursor always takes exactly same space
+	baseIndent := "   " // 3 spaces
+	cursor := " "       // 1 space when not focused
+	if focused {
+		cursor = ">"    // 1 character when focused
+	}
+
+	// Title styling with FIXED width to prevent right-align jumping
+	titleStyle := lipgloss.NewStyle().Width(40) // Fixed width regardless of styling
+	if focused {
+		titleStyle = titleStyle.Foreground(lipgloss.Color("39")).Bold(true)
+	}
+
+	title := titleStyle.Render(field.title)
+
+	// Value rendering based on type
+	var value string
+	switch field.fieldType {
+	case "toggle":
+		if field.value.(bool) {
+			value = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("34")).
+				Bold(true).
+				Render("ON")
+		} else {
+			value = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("240")).
+				Render("OFF")
+		}
+	case "select":
+		value = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("39")).
+			Bold(true).
+			Render(field.value.(string))
+	case "text":
+		value = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("39")).
+			Italic(true).
+			Render(field.value.(string))
+	}
+
+	// FIXED: Use fixed-width title to ensure right-alignment stays consistent
+	line := fmt.Sprintf("%s%s%s %s", baseIndent, cursor, title, value)
+
+	// Always show description for better UX
+	if field.description != "" {
+		descStyle := lipgloss.NewStyle().
+			Foreground(lipgloss.Color("240")).
+			Italic(true)
+		line += "\n" + baseIndent + "  " + descStyle.Render(field.description)
+	}
+
+	return line
 }
 
 func switchToNextTab(model *TabbedConfigModel) *TabbedConfigModel {
