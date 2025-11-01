@@ -347,6 +347,42 @@ func createSettingsModal(existing *Config) *SettingsModal {
 				},
 			},
 		},
+		{
+			name:        "default-container",
+			title:       "Default Container",
+			description: "Configure default container image and update behavior",
+			fields: []SettingsField{
+				{
+					name:        "container-image",
+					fieldType:   "text",
+					title:       "Container Image",
+					description: "Default container image to use (supports any registry)",
+					value:       existing.DefaultContainer.Image,
+				},
+				{
+					name:        "check-updates",
+					fieldType:   "toggle",
+					title:       "Check for updates",
+					description: "Automatically check registry for new image versions",
+					value:       existing.DefaultContainer.CheckForUpdates,
+				},
+				{
+					name:        "auto-pull",
+					fieldType:   "toggle",
+					title:       "Auto-pull updates",
+					description: "Automatically download new versions when found",
+					value:       existing.DefaultContainer.AutoPullUpdates,
+				},
+				{
+					name:        "check-frequency",
+					fieldType:   "select",
+					title:       "Check frequency",
+					description: "How often to check for updates",
+					value:       formatFrequencyForDisplay(existing.DefaultContainer.CheckFrequencyHours),
+					options:     []string{"6h", "12h", "24h", "48h", "weekly"},
+				},
+			},
+		},
 	}
 
 	return &SettingsModal{
@@ -433,6 +469,7 @@ func runSettingsModal(existing *Config, configPath string, verbose bool) error {
 func applyModalConfigUpdates(modal *SettingsModal, configPath string) error {
 	runtime := ""
 	creds := Credentials{Git: true}
+	var containerConfig *DefaultContainerConfig
 
 	// Extract values from modal sections
 	for _, section := range modal.sections {
@@ -450,6 +487,26 @@ func applyModalConfigUpdates(modal *SettingsModal, configPath string) error {
 				creds.NPM = field.value.(bool)
 			case "aws":
 				creds.AWS = field.value.(bool)
+			case "container-image":
+				if containerConfig == nil {
+					containerConfig = &DefaultContainerConfig{}
+				}
+				containerConfig.Image = field.value.(string)
+			case "check-updates":
+				if containerConfig == nil {
+					containerConfig = &DefaultContainerConfig{}
+				}
+				containerConfig.CheckForUpdates = field.value.(bool)
+			case "auto-pull":
+				if containerConfig == nil {
+					containerConfig = &DefaultContainerConfig{}
+				}
+				containerConfig.AutoPullUpdates = field.value.(bool)
+			case "check-frequency":
+				if containerConfig == nil {
+					containerConfig = &DefaultContainerConfig{}
+				}
+				containerConfig.CheckFrequencyHours = parseFrequencyFromDisplay(field.value.(string))
 			}
 		}
 	}
@@ -457,9 +514,80 @@ func applyModalConfigUpdates(modal *SettingsModal, configPath string) error {
 	updates := ConfigUpdates{
 		ContainerRuntime:   &runtime,
 		DefaultCredentials: &creds,
+		DefaultContainer:   containerConfig,
 	}
 
 	return UpdateConfigSafely(configPath, updates)
+}
+
+// formatFrequencyForDisplay converts hours to display format
+func formatFrequencyForDisplay(hours int) string {
+	switch hours {
+	case 6:
+		return "6h"
+	case 12:
+		return "12h"
+	case 24:
+		return "24h"
+	case 48:
+		return "48h"
+	case 168:
+		return "weekly"
+	default:
+		return "24h"
+	}
+}
+
+// parseFrequencyFromDisplay converts display format to hours
+func parseFrequencyFromDisplay(display string) int {
+	switch display {
+	case "6h":
+		return 6
+	case "12h":
+		return 12
+	case "24h":
+		return 24
+	case "48h":
+		return 48
+	case "weekly":
+		return 168
+	default:
+		return 24
+	}
+}
+
+// supportsTextEditing checks if modal supports text editing
+func (m *SettingsModal) supportsTextEditing() bool {
+	return true // We support text editing
+}
+
+// extractDefaultContainerUpdates extracts default container updates from modal
+func extractDefaultContainerUpdates(modal *SettingsModal) ConfigUpdates {
+	var containerConfig *DefaultContainerConfig
+
+	// Find default container section
+	for _, section := range modal.sections {
+		if section.name == "default-container" {
+			containerConfig = &DefaultContainerConfig{}
+			for _, field := range section.fields {
+				switch field.name {
+				case "container-image":
+					containerConfig.Image = field.value.(string)
+				case "check-updates":
+					containerConfig.CheckForUpdates = field.value.(bool)
+				case "auto-pull":
+					containerConfig.AutoPullUpdates = field.value.(bool)
+				case "check-frequency":
+					containerConfig.CheckFrequencyHours = parseFrequencyFromDisplay(field.value.(string))
+				}
+			}
+			break
+		}
+	}
+
+	return ConfigUpdates{
+		DefaultContainer: containerConfig,
+	}
 }
 
 // Init implements tea.Model for SettingsModal
@@ -690,6 +818,11 @@ func (m *SettingsModal) renderField(field SettingsField, focused bool) string {
 		value = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("39")).
 			Bold(true).
+			Render(field.value.(string))
+	case "text":
+		value = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("39")).
+			Italic(true).
 			Render(field.value.(string))
 	}
 
